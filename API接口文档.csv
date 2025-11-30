@@ -1,0 +1,603 @@
+序号,接口分类,接口名称,HTTP方法,接口路径,功能描述,请求参数,请求体示例,响应参数,响应示例,实现状态,实现文件,备注
+1,容器管理,创建容器组,POST,/clusters,创建新的 Elasticsearch 集群容器组,"tenant_org_id (string, 必填): 租户组织 ID
+user (string, 必填): 用户 ID
+service_name (string, 必填): 服务名称
+namespace (string, 可选): Kubernetes 命名空间
+replicas (int, 必填): 副本数量
+cpu_request (string): CPU 请求值，如 ""1""
+cpu_limit (string): CPU 限制值，如 ""2""
+mem_request (string): 内存请求值，如 ""2Gi""
+mem_limit (string): 内存限制值，如 ""4Gi""
+disk_size (string): 磁盘大小，如 ""50Gi""
+gpu_count (int): GPU 数量
+dimension (int): 向量维度
+vector_count (int): 底库向量数
+gitlab_url (string, 可选): GitLab 配置地址","{
+  ""tenant_org_id"": ""org-001"",
+  ""user"": ""alice"",
+  ""service_name"": ""vector-search"",
+  ""replicas"": 3,
+  ""cpu_request"": ""1"",
+  ""cpu_limit"": ""2"",
+  ""mem_request"": ""2Gi"",
+  ""mem_limit"": ""4Gi"",
+  ""disk_size"": ""50Gi"",
+  ""gpu_count"": 0,
+  ""dimension"": 128,
+  ""vector_count"": 1000000
+}","namespace (string): 创建的命名空间
+status (string): 创建状态
+message (string): 状态消息
+replicas (int): 副本数量
+resources (object): 资源配置信息","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""status"": ""created"",
+  ""message"": ""Cluster created successfully"",
+  ""replicas"": 3,
+  ""resources"": {
+    ""cpu"": ""1/2"",
+    ""memory"": ""2Gi/4Gi"",
+    ""disk"": ""50Gi""
+  }
+}",✅ 已实现,server/main.go (CreateClusterHandler),"支持多租户隔离，自动生成命名空间
+包含 10 次部署状态上报
+元数据优先保存策略"
+2,容器管理,删除容器组,DELETE,/clusters,删除指定的集群容器组,"namespace (string, 必填): 要删除的命名空间","{
+  ""namespace"": ""org-001-alice-vector-search""
+}","status (string): 删除状态
+message (string): 状态消息","{
+  ""status"": ""success"",
+  ""message"": ""Cluster deleted successfully""
+}",✅ 已实现,server/main.go (DeleteClusterHandler),支持逻辑删除和物理删除
+3,容器管理,查询服务列表,GET,/clusters,获取所有集群容器组列表,无,无,"clusters (array): 集群列表
+  - namespace (string): 命名空间
+  - user (string): 用户 ID
+  - service_name (string): 服务名称
+  - status (string): 运行状态
+  - replicas (int): 副本数量
+  - cpu_usage (float): CPU 使用率 (%)
+  - memory_usage (float): 内存使用率 (%)
+  - qps (int): 每秒查询数","{
+  ""clusters"": [
+    {
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""user"": ""alice"",
+      ""service_name"": ""vector-search"",
+      ""status"": ""running"",
+      ""replicas"": 3,
+      ""cpu_usage"": 45.2,
+      ""memory_usage"": 68.5,
+      ""qps"": 1200
+    }
+  ]
+}",✅ 已实现,server/main.go (GetClustersHandler),合并元数据和 K8s 实时状态
+4,容器管理,查询服务详情,GET,/clusters/{namespace},获取指定集群的详细信息,"namespace (path, 必填): 集群命名空间",无,"namespace (string): 命名空间
+user (string): 用户 ID
+service_name (string): 服务名称
+tenant_org_id (string): 租户组织 ID
+replicas (int): 副本数量
+cpu (object): CPU 配置
+memory (object): 内存配置
+disk (string): 磁盘大小
+gpu_count (int): GPU 数量
+dimension (int): 向量维度
+vector_count (int): 向量数量
+status (string): 运行状态
+cpu_usage (float): CPU 使用率
+memory_usage (float): 内存使用率
+disk_usage (float): 磁盘使用率
+qps (int): 每秒查询数
+created_at (string): 创建时间","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""user"": ""alice"",
+  ""service_name"": ""vector-search"",
+  ""tenant_org_id"": ""org-001"",
+  ""replicas"": 3,
+  ""cpu"": { ""request"": ""1"", ""limit"": ""2"" },
+  ""memory"": { ""request"": ""2Gi"", ""limit"": ""4Gi"" },
+  ""disk"": ""50Gi"",
+  ""gpu_count"": 0,
+  ""dimension"": 128,
+  ""vector_count"": 1000000,
+  ""status"": ""running"",
+  ""cpu_usage"": 45.2,
+  ""memory_usage"": 68.5,
+  ""disk_usage"": 32.1,
+  ""qps"": 1200,
+  ""created_at"": ""2025-11-30T10:00:00Z""
+}",✅ 已实现,server/main.go (GetClusterHandler),返回完整的集群配置和实时监控数据
+5,容器管理,重启容器,POST,/clusters/restart,重启指定集群的容器,"namespace (string, 必填): 要重启的命名空间","{
+  ""namespace"": ""org-001-alice-vector-search""
+}","status (string): 重启状态
+message (string): 状态消息","{
+  ""status"": ""success"",
+  ""message"": ""Pods restarted successfully""
+}",✅ 已实现,通过 K8s API,删除 Pod 触发自动重启
+6,容器管理,扩缩容,POST,/clusters/scale,手动扩缩容集群副本数,"namespace (string, 必填): 命名空间
+replicas (int, 必填): 新的副本数量","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""replicas"": 5
+}","status (string): 扩缩容状态
+message (string): 状态消息
+new_replicas (int): 新的副本数量","{
+  ""status"": ""success"",
+  ""message"": ""Cluster scaled successfully"",
+  ""new_replicas"": 5
+}",✅ 已实现,server/main.go (ScaleClusterHandler),包含配额检查
+7,向量索引,创建向量索引,POST,/vector-indexes,创建新的向量索引,"namespace (string, 必填): 命名空间
+index_name (string, 必填): 索引名称
+dimension (int, 必填): 向量维度
+metric (string): 距离度量，可选 l2/cosine/dot，默认 l2
+nlist (int): IVF 聚类数量，默认 100
+nprobe (int): IVF 搜索簇数，默认 10","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""index_name"": ""my_vectors"",
+  ""dimension"": 128,
+  ""metric"": ""l2"",
+  ""nlist"": 100,
+  ""nprobe"": 10
+}","index_name (string): 索引名称
+status (string): 创建状态
+message (string): 状态消息
+settings (object): 索引配置","{
+  ""index_name"": ""my_vectors"",
+  ""status"": ""created"",
+  ""message"": ""Index created successfully"",
+  ""settings"": {
+    ""dimension"": 128,
+    ""metric"": ""l2"",
+    ""nlist"": 100,
+    ""nprobe"": 10
+  }
+}",✅ 已实现,server/main.go (CreateVectorIndexHandler) + ES Plugin,自动配置 vector 字段类型
+8,向量索引,查询索引列表,GET,/vector-indexes,获取所有向量索引列表,"namespace (string, 可选): 过滤命名空间",无,"indexes (array): 索引列表
+  - index_name (string): 索引名称
+  - namespace (string): 命名空间
+  - dimension (int): 向量维度
+  - metric (string): 距离度量
+  - nlist (int): 聚类数量
+  - nprobe (int): 搜索簇数
+  - status (string): 索引状态
+  - doc_count (int): 文档数量
+  - created_at (string): 创建时间","{
+  ""indexes"": [
+    {
+      ""index_name"": ""my_vectors"",
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""dimension"": 128,
+      ""metric"": ""l2"",
+      ""nlist"": 100,
+      ""nprobe"": 10,
+      ""status"": ""active"",
+      ""doc_count"": 50000,
+      ""created_at"": ""2025-11-30T10:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/main.go (GetVectorIndexesHandler),从元数据服务查询
+9,向量索引,删除向量索引,DELETE,/vector-indexes,删除指定的向量索引,"namespace (string, 必填): 命名空间
+index_name (string, 必填): 索引名称","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""index_name"": ""my_vectors""
+}","status (string): 删除状态
+message (string): 状态消息","{
+  ""status"": ""success"",
+  ""message"": ""Index deleted successfully""
+}",✅ 已实现,server/main.go (DeleteVectorIndexHandler),同时删除 ES 索引和元数据
+10,向量索引,训练 IVF 索引,POST,/{index_name}/_ivf/train,训练向量索引的 IVF 模型,"field (string, 必填): 向量字段名
+nlist (int, 可选): 聚类数量，默认使用索引配置","{
+  ""field"": ""embedding"",
+  ""nlist"": 100
+}","success (bool): 训练是否成功
+message (string): 状态消息
+vector_count (int): 训练向量数量
+nlist (int): 聚类数量
+training_time (float): 训练耗时（秒）","{
+  ""success"": true,
+  ""message"": ""IVF index trained successfully"",
+  ""vector_count"": 50000,
+  ""nlist"": 100,
+  ""training_time"": 12.5
+}",✅ 已实现,es-plugin IVFQueryBuilder.trainIndex(),KMeans 聚类训练
+11,向量检索,插入向量,POST,/{index_name}/_doc/{doc_id},插入单个向量文档,"title (string): 文档标题
+embedding (array): 向量数组，维度需匹配索引配置
+metadata (object, 可选): 其他元数据字段","{
+  ""title"": ""Document 1"",
+  ""embedding"": [0.1, 0.2, 0.3, ..., 0.128],
+  ""category"": ""technology"",
+  ""tags"": [""ai"", ""ml""]
+}","_index (string): 索引名称
+_id (string): 文档 ID
+_version (int): 文档版本
+result (string): 操作结果 (created/updated)
+_shards (object): 分片信息","{
+  ""_index"": ""my_vectors"",
+  ""_id"": ""1"",
+  ""_version"": 1,
+  ""result"": ""created"",
+  ""_shards"": {
+    ""total"": 2,
+    ""successful"": 2,
+    ""failed"": 0
+  }
+}",✅ 已实现,es-plugin VectorFieldMapper,"自动添加向量到 IVF 索引
+维度验证
+元数据提取"
+12,向量检索,批量插入向量,POST,/{index_name}/_bulk,批量插入向量文档,"使用 Elasticsearch Bulk API 格式
+每行为 action，下一行为 document","{""index"":{""_id"":""1""}}
+{""title"":""Doc 1"",""embedding"":[0.1,0.2,...]}
+{""index"":{""_id"":""2""}}
+{""title"":""Doc 2"",""embedding"":[0.2,0.3,...]}","took (int): 耗时（毫秒）
+errors (bool): 是否有错误
+items (array): 每个操作的结果","{
+  ""took"": 150,
+  ""errors"": false,
+  ""items"": [
+    {
+      ""index"": {
+        ""_index"": ""my_vectors"",
+        ""_id"": ""1"",
+        ""result"": ""created""
+      }
+    }
+  ]
+}",✅ 已实现,Elasticsearch Bulk API + VectorFieldMapper,自动批量添加到 IVF 索引
+13,向量检索,向量搜索 (ANN),POST,/{index_name}/_search,执行近似最近邻向量搜索,"query.ann.field (string, 必填): 向量字段名
+query.ann.vector (array, 必填): 查询向量
+query.ann.algorithm (string): 算法类型，默认 ivf
+query.ann.nprobe (int): 搜索簇数，默认 10
+query.ann.k (int): 返回结果数，默认 10
+size (int): 返回文档数量","{
+  ""query"": {
+    ""ann"": {
+      ""field"": ""embedding"",
+      ""vector"": [0.1, 0.2, 0.3, ..., 0.128],
+      ""algorithm"": ""ivf"",
+      ""nprobe"": 10,
+      ""k"": 10
+    }
+  },
+  ""size"": 10
+}","took (int): 查询耗时（毫秒）
+hits.total.value (int): 匹配文档数
+hits.max_score (float): 最高得分
+hits.hits (array): 结果文档列表
+  - _index (string): 索引名
+  - _id (string): 文档 ID
+  - _score (float): 相似度得分
+  - _source (object): 文档内容","{
+  ""took"": 5,
+  ""hits"": {
+    ""total"": { ""value"": 10 },
+    ""max_score"": 0.95,
+    ""hits"": [
+      {
+        ""_index"": ""my_vectors"",
+        ""_id"": ""42"",
+        ""_score"": 0.95,
+        ""_source"": {
+          ""title"": ""Document 42"",
+          ""embedding"": [0.1, 0.2, ...],
+          ""category"": ""technology""
+        }
+      }
+    ]
+  }
+}",✅ 已实现,es-plugin IVFQueryBuilder.doToQuery(),"IVF 算法实现
+1. 计算到聚类中心距离
+2. 选择最近 nprobe 个簇
+3. 簇内精确距离计算
+4. 返回 Top-K 结果"
+14,向量检索,混合查询,POST,/{index_name}/_search,向量搜索 + 结构化过滤,"query.bool.must (array): 必须匹配条件
+  - ann: 向量搜索
+  - term/match: 结构化过滤
+size (int): 返回数量","{
+  ""query"": {
+    ""bool"": {
+      ""must"": [
+        {
+          ""ann"": {
+            ""field"": ""embedding"",
+            ""vector"": [0.1, 0.2, ...],
+            ""nprobe"": 10,
+            ""k"": 20
+          }
+        },
+        {
+          ""term"": {
+            ""category"": ""technology""
+          }
+        }
+      ]
+    }
+  },
+  ""size"": 10
+}","took (int): 查询耗时
+hits (object): 搜索结果（同向量搜索）","{
+  ""took"": 8,
+  ""hits"": {
+    ""total"": { ""value"": 5 },
+    ""hits"": [...]
+  }
+}",✅ 已实现,Elasticsearch Query DSL + IVF Plugin,向量搜索结果可与其他查询组合
+15,监控,查询集群监控,GET,/metrics,获取集群监控指标,"namespace (string, 可选): 过滤命名空间",无,"metrics (array): 监控指标列表
+  - namespace (string): 命名空间
+  - cpu_usage (float): CPU 使用率 (%)
+  - memory_usage (float): 内存使用率 (%)
+  - disk_usage (float): 磁盘使用率 (%)
+  - qps (int): 每秒查询数
+  - pod_count (int): Pod 数量
+  - timestamp (string): 时间戳","{
+  ""metrics"": [
+    {
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""cpu_usage"": 45.2,
+      ""memory_usage"": 68.5,
+      ""disk_usage"": 32.1,
+      ""qps"": 1200,
+      ""pod_count"": 3,
+      ""timestamp"": ""2025-11-30T12:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/main.go (GetMetricsHandler),从元数据服务和 Prometheus 获取
+16,监控,查询 QPS 数据,GET,/qps/{namespace},获取指定集群的 QPS 数据,"namespace (path, 必填): 集群命名空间",无,"namespace (string): 命名空间
+qps (int): 当前 QPS
+avg_qps (int): 平均 QPS
+max_qps (int): 最大 QPS
+timestamp (string): 时间戳
+history (array): 历史 QPS 数据（可选）","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""qps"": 1200,
+  ""avg_qps"": 1150,
+  ""max_qps"": 1500,
+  ""timestamp"": ""2025-11-30T12:00:00Z"",
+  ""history"": [
+    { ""time"": ""12:00"", ""qps"": 1200 },
+    { ""time"": ""11:55"", ""qps"": 1180 }
+  ]
+}",✅ 已实现,server/main.go (GetQPSHandler),从元数据服务查询
+17,监控,查询容器监控,GET,/monitoring/container-metrics,获取容器级别的监控指标,"namespace (string, 可选): 过滤命名空间
+container_name (string, 可选): 过滤容器名",无,"containers (array): 容器监控列表
+  - namespace (string): 命名空间
+  - container_name (string): 容器名
+  - cpu_usage (float): CPU 使用率
+  - memory_usage (float): 内存使用率
+  - disk_usage (float): 磁盘使用率
+  - startup_cpu (float): 启动时 CPU
+  - startup_memory (float): 启动时内存
+  - startup_disk (float): 启动时磁盘
+  - plugin_qps (int): 插件 QPS
+  - timestamp (string): 时间戳","{
+  ""containers"": [
+    {
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""container_name"": ""elasticsearch-0"",
+      ""cpu_usage"": 42.5,
+      ""memory_usage"": 65.2,
+      ""disk_usage"": 30.1,
+      ""startup_cpu"": 10.2,
+      ""startup_memory"": 2048,
+      ""startup_disk"": 5120,
+      ""plugin_qps"": 400,
+      ""timestamp"": ""2025-11-30T12:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/main.go (GetContainerMetricsHandler),从元数据服务和 Prometheus 获取
+18,自动扩缩容,查询扩缩容配置,GET,/autoscale/config/{namespace},获取集群的扩缩容配置,"namespace (path, 必填): 集群命名空间",无,"namespace (string): 命名空间
+enabled (bool): 是否启用自动扩缩容
+min_replicas (int): 最小副本数
+max_replicas (int): 最大副本数
+thresholds (object): 阈值配置
+  - cpu_scale_up (float): CPU 扩容阈值
+  - cpu_scale_down (float): CPU 缩容阈值
+  - memory_scale_up (float): 内存扩容阈值
+  - memory_scale_down (float): 内存缩容阈值
+  - qps_scale_up (int): QPS 扩容阈值
+  - qps_scale_down (int): QPS 缩容阈值
+cooldown (object): 冷却期配置
+  - scale_up_minutes (int): 扩容冷却期（分钟）
+  - scale_down_minutes (int): 缩容冷却期（分钟）","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""enabled"": true,
+  ""min_replicas"": 1,
+  ""max_replicas"": 10,
+  ""thresholds"": {
+    ""cpu_scale_up"": 70.0,
+    ""cpu_scale_down"": 30.0,
+    ""memory_scale_up"": 80.0,
+    ""memory_scale_down"": 40.0,
+    ""qps_scale_up"": 1000,
+    ""qps_scale_down"": 200
+  },
+  ""cooldown"": {
+    ""scale_up_minutes"": 5,
+    ""scale_down_minutes"": 10
+  }
+}",✅ 已实现,server/autoscaler.go,"冷却期机制
+历史趋势分析
+智能调整算法"
+19,自动扩缩容,更新扩缩容配置,PUT,/autoscale/config/{namespace},更新集群的扩缩容配置,"namespace (path, 必填): 集群命名空间
+enabled (bool): 是否启用
+min_replicas (int): 最小副本数
+max_replicas (int): 最大副本数
+thresholds (object): 阈值配置
+cooldown (object): 冷却期配置","{
+  ""enabled"": true,
+  ""min_replicas"": 2,
+  ""max_replicas"": 8,
+  ""thresholds"": {
+    ""cpu_scale_up"": 75.0,
+    ""cpu_scale_down"": 35.0
+  }
+}","status (string): 更新状态
+message (string): 状态消息","{
+  ""status"": ""success"",
+  ""message"": ""Autoscale config updated successfully""
+}",✅ 已实现,server/autoscaler.go,自动应用新配置
+20,元数据,查询索引元数据,GET,/metadata/indexes,获取所有索引元数据,"namespace (string, 可选): 过滤命名空间",无,"indexes (array): 索引元数据列表
+  - index_name (string): 索引名称
+  - namespace (string): 命名空间
+  - dimension (int): 向量维度
+  - metric (string): 距离度量
+  - ivf_params (object): IVF 参数
+  - created_by (string): 创建者
+  - status (string): 状态
+  - created_at (string): 创建时间","{
+  ""indexes"": [
+    {
+      ""index_name"": ""my_vectors"",
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""dimension"": 128,
+      ""metric"": ""l2"",
+      ""ivf_params"": {
+        ""nlist"": 100,
+        ""nprobe"": 10
+      },
+      ""created_by"": ""alice"",
+      ""status"": ""active"",
+      ""created_at"": ""2025-11-30T10:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/metadata.go,支持 PostgreSQL 和文件存储
+21,元数据,查询租户配额,GET,/metadata/tenants/{user},获取租户的资源配额,"user (path, 必填): 用户 ID",无,"user_id (string): 用户 ID
+tenant_org_id (string): 租户组织 ID
+max_clusters (int): 最大集群数
+max_indexes (int): 最大索引数
+max_cpu (string): 最大 CPU
+max_memory (string): 最大内存
+max_storage (string): 最大存储
+current_usage (object): 当前使用量
+  - clusters (int): 集群数
+  - indexes (int): 索引数
+  - cpu (string): CPU 使用
+  - memory (string): 内存使用
+  - storage (string): 存储使用","{
+  ""user_id"": ""alice"",
+  ""tenant_org_id"": ""org-001"",
+  ""max_clusters"": 10,
+  ""max_indexes"": 50,
+  ""max_cpu"": ""20"",
+  ""max_memory"": ""100Gi"",
+  ""max_storage"": ""1Ti"",
+  ""current_usage"": {
+    ""clusters"": 3,
+    ""indexes"": 15,
+    ""cpu"": ""6"",
+    ""memory"": ""24Gi"",
+    ""storage"": ""150Gi""
+  }
+}",✅ 已实现,server/metadata.go,配额检查和强制执行
+22,元数据,查询部署状态,GET,/metadata/deployments,获取所有部署状态,"namespace (string, 可选): 过滤命名空间
+user (string, 可选): 过滤用户",无,"deployments (array): 部署状态列表
+  - namespace (string): 命名空间
+  - user (string): 用户
+  - service_name (string): 服务名称
+  - status (string): 状态
+  - replicas (int): 副本数
+  - cpu_usage (float): CPU 使用率
+  - memory_usage (float): 内存使用率
+  - created_at (string): 创建时间
+  - updated_at (string): 更新时间","{
+  ""deployments"": [
+    {
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""user"": ""alice"",
+      ""service_name"": ""vector-search"",
+      ""status"": ""running"",
+      ""replicas"": 3,
+      ""cpu_usage"": 45.2,
+      ""memory_usage"": 68.5,
+      ""created_at"": ""2025-11-30T10:00:00Z"",
+      ""updated_at"": ""2025-11-30T12:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/metadata.go,实时状态跟踪
+23,元数据,查询租户容器,GET,/tenant/containers,获取所有租户容器信息,"user (string, 可选): 过滤用户
+tenant_org_id (string, 可选): 过滤租户组织",无,"containers (array): 租户容器列表
+  - user (string): 用户
+  - service_name (string): 服务名称
+  - namespace (string): 命名空间
+  - tenant_org_id (string): 租户组织 ID
+  - replicas (int): 副本数
+  - cpu (object): CPU 配置
+  - memory (object): 内存配置
+  - disk (string): 磁盘大小
+  - status (string): 状态
+  - created_at (string): 创建时间
+  - sync_time (string): 同步时间","{
+  ""containers"": [
+    {
+      ""user"": ""alice"",
+      ""service_name"": ""vector-search"",
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""tenant_org_id"": ""org-001"",
+      ""replicas"": 3,
+      ""cpu"": { ""request"": ""1"", ""limit"": ""2"" },
+      ""memory"": { ""request"": ""2Gi"", ""limit"": ""4Gi"" },
+      ""disk"": ""50Gi"",
+      ""status"": ""running"",
+      ""created_at"": ""2025-11-30T10:00:00Z"",
+      ""sync_time"": ""2025-11-30T12:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/main.go (GetTenantContainersHandler),支持多维度过滤
+24,元数据,查询部署报告,GET,/deployment/reports,获取部署报告列表,"user (string, 可选): 过滤用户
+service_name (string, 可选): 过滤服务",无,"reports (array): 部署报告列表
+  - report_id (string): 报告 ID
+  - user (string): 用户
+  - service_name (string): 服务名称
+  - namespace (string): 命名空间
+  - status (string): 部署状态
+  - message (string): 状态消息
+  - replicas (int): 副本数
+  - resources (object): 资源配置
+  - timestamp (string): 时间戳","{
+  ""reports"": [
+    {
+      ""report_id"": ""alice_vector-search_1701345600"",
+      ""user"": ""alice"",
+      ""service_name"": ""vector-search"",
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""status"": ""completed"",
+      ""message"": ""Cluster created successfully"",
+      ""replicas"": 3,
+      ""resources"": {
+        ""cpu"": ""1/2"",
+        ""memory"": ""2Gi/4Gi""
+      },
+      ""timestamp"": ""2025-11-30T10:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/reporting.go,详细的部署过程记录
+25,IVF 算法,获取 IVF 索引统计,GET,/{index_name}/_ivf/stats,获取 IVF 索引的统计信息,无,无,"nlist (int): 聚类数量
+dimension (int): 向量维度
+metricType (string): 距离度量类型
+isTrained (bool): 是否已训练
+totalVectors (int): 总向量数
+minClusterSize (int): 最小簇大小
+maxClusterSize (int): 最大簇大小
+avgClusterSize (float): 平均簇大小","{
+  ""nlist"": 100,
+  ""dimension"": 128,
+  ""metricType"": ""l2"",
+  ""isTrained"": true,
+  ""totalVectors"": 50000,
+  ""minClusterSize"": 350,
+  ""maxClusterSize"": 650,
+  ""avgClusterSize"": 500.0
+}",✅ 已实现,es-plugin InvertedFileIndex.getStats(),实时索引统计信息
+26,健康检查,服务健康检查,GET,/health,检查服务健康状态,无,无,"status (string): 健康状态 (healthy/unhealthy)
+services (object): 各服务状态
+  - manager (string): 管理服务状态
+  - kubernetes (string): K8s 状态
+  - metadata (string): 元数据服务状态
+  - elasticsearch (string): ES 状态
+timestamp (string): 检查时间","{
+  ""status"": ""healthy"",
+  ""services"": {
+    ""manager"": ""healthy"",
+    ""kubernetes"": ""healthy"",
+    ""metadata"": ""healthy"",
+    ""elasticsearch"": ""healthy""
+  },
+  ""timestamp"": ""2025-11-30T12:00:00Z""
+}",✅ 已实现,server/main.go (HealthCheckHandler),多服务健康检查

@@ -1,0 +1,64 @@
+模块,类名,方法名,功能描述,输入参数,返回值,时间复杂度,空间复杂度,实现状态,代码位置
+向量相似度,VectorSimilarity,l2Distance,"计算两个向量的 L2 (欧氏) 距离","v1: float[] - 第一个向量
+v2: float[] - 第二个向量",float - L2 距离值,O(d),O(1),✅ 已实现,VectorSimilarity.java:18-28
+向量相似度,VectorSimilarity,cosineSimilarity,"计算两个向量的 Cosine 相似度","v1: float[] - 第一个向量
+v2: float[] - 第二个向量",float - Cosine 相似度 (范围 [-1, 1]),O(d),O(1),✅ 已实现,VectorSimilarity.java:37-60
+向量相似度,VectorSimilarity,dotProduct,"计算两个向量的点积","v1: float[] - 第一个向量
+v2: float[] - 第二个向量",float - 点积值,O(d),O(1),✅ 已实现,VectorSimilarity.java:69-81
+向量相似度,VectorSimilarity,batchL2Distance,"批量计算查询向量到多个向量的 L2 距离","query: float[] - 查询向量
+vectors: float[][] - 向量数组",float[] - 距离数组,O(n×d),O(n),✅ 已实现,VectorSimilarity.java:90-97
+向量相似度,VectorSimilarity,batchCosineSimilarity,"批量计算查询向量到多个向量的 Cosine 相似度","query: float[] - 查询向量
+vectors: float[][] - 向量数组",float[] - 相似度数组,O(n×d),O(n),✅ 已实现,VectorSimilarity.java:106-113
+向量相似度,VectorSimilarity,batchDotProduct,"批量计算查询向量到多个向量的点积","query: float[] - 查询向量
+vectors: float[][] - 向量数组",float[] - 点积数组,O(n×d),O(n),✅ 已实现,VectorSimilarity.java:122-129
+向量相似度,VectorSimilarity,findKNearestL2,"基于 L2 距离查找 K 近邻","query: float[] - 查询向量
+vectors: float[][] - 向量数组
+k: int - 近邻数量",int[] - K 个最近邻的索引 (按距离升序),O(n×d + n×log(n)),O(n),✅ 已实现,VectorSimilarity.java:138-142
+向量相似度,VectorSimilarity,findKNearestCosine,"基于 Cosine 相似度查找 K 近邻","query: float[] - 查询向量
+vectors: float[][] - 向量数组
+k: int - 近邻数量",int[] - K 个最相似向量的索引 (按相似度降序),O(n×d + n×log(n)),O(n),✅ 已实现,VectorSimilarity.java:151-155
+KMeans 训练,SimpleKMeansTrainer,构造函数,"创建 KMeans 训练器","nlist: int - 聚类数量
+maxIterations: int - 最大迭代次数 (默认 100)",SimpleKMeansTrainer 实例,O(1),O(1),✅ 已实现,SimpleKMeansTrainer.java:22-27
+KMeans 训练,SimpleKMeansTrainer,train,"训练 KMeans 聚类模型","vectors: float[][] - 训练向量数组",float[][] - 聚类中心数组 (nlist × dimension),O(n×k×d×i),O(n×d + k×d),✅ 已实现,SimpleKMeansTrainer.java:44-73
+KMeans 训练,SimpleKMeansTrainer,assignClusters,"将向量分配到最近的聚类","vectors: float[][] - 待分配向量
+centroids: float[][] - 聚类中心",int[] - 每个向量所属的簇 ID,O(n×k×d),O(n),✅ 已实现,SimpleKMeansTrainer.java:164-180
+倒排索引,InvertedFileIndex,构造函数,"创建 IVF 索引","nlist: int - 聚类数量
+dimension: int - 向量维度
+metricType: String - 距离度量类型 (l2/cosine/dot)",InvertedFileIndex 实例,O(1),O(nlist),✅ 已实现,InvertedFileIndex.java:52-65
+倒排索引,InvertedFileIndex,train,"训练 IVF 索引 (KMeans 聚类)","trainingVectors: float[][] - 训练向量数组",void,O(n×k×d×i),O(n×d + k×d),✅ 已实现,InvertedFileIndex.java:73-83
+倒排索引,InvertedFileIndex,addVector,"添加单个向量到索引","docId: String - 文档 ID
+vector: float[] - 向量
+metadata: Map<String, Object> - 元数据",void,O(k×d),O(d),✅ 已实现,InvertedFileIndex.java:92-113
+倒排索引,InvertedFileIndex,addVectors,"批量添加向量到索引","vectors: List<VectorDoc> - 向量文档列表",void,O(m×k×d),O(m×d),✅ 已实现,InvertedFileIndex.java:120-124
+倒排索引,InvertedFileIndex,search,"执行 ANN 搜索","queryVector: float[] - 查询向量
+k: int - 返回结果数
+nprobe: int - 搜索的簇数量",List<SearchResult> - 搜索结果列表 (按相似度排序),O(k×d + nprobe×m×d + m×log(m)),O(nprobe×m),✅ 已实现,InvertedFileIndex.java:133-160
+倒排索引,InvertedFileIndex,save,"保存索引到文件","filepath: String - 文件路径",void,O(n×d),O(1),✅ 已实现,InvertedFileIndex.java:324-329
+倒排索引,InvertedFileIndex,load,"从文件加载索引","filepath: String - 文件路径",InvertedFileIndex - 加载的索引实例,O(n×d),O(n×d),✅ 已实现,InvertedFileIndex.java:335-341
+倒排索引,InvertedFileIndex,getStats,"获取索引统计信息",无,Map<String, Object> - 统计信息,O(nlist),O(1),✅ 已实现,InvertedFileIndex.java:299-321
+倒排索引,InvertedFileIndex,isTrained,"检查索引是否已训练",无,boolean - 是否已训练,O(1),O(1),✅ 已实现,InvertedFileIndex.java:348-350
+倒排索引,InvertedFileIndex,size,"获取索引中的向量总数",无,int - 向量数量,O(nlist),O(1),✅ 已实现,InvertedFileIndex.java:356-362
+倒排索引,InvertedFileIndex,clear,"清空索引中的所有向量 (保留训练)",无,void,O(nlist),O(1),✅ 已实现,InvertedFileIndex.java:368-372
+查询构建,IVFQueryBuilder,doToQuery,"将 IVF 查询转换为 Lucene Query","context: SearchExecutionContext - 搜索上下文",Query - Lucene 查询对象,O(k×d + nprobe×m×d),O(nprobe×m),✅ 已实现,IVFQueryBuilder.java:107-130
+查询构建,IVFQueryBuilder,addVectorToIndex,"添加向量到 IVF 索引 (静态方法)","indexName: String - 索引名称
+docId: String - 文档 ID
+vector: float[] - 向量
+metadata: Map<String, Object> - 元数据",void,O(k×d),O(d),✅ 已实现,IVFQueryBuilder.java:181-196
+查询构建,IVFQueryBuilder,trainIndex,"训练 IVF 索引 (静态方法)","indexName: String - 索引名称
+trainingVectors: float[][] - 训练向量
+dimension: int - 向量维度
+metricType: String - 距离度量类型",void,O(n×k×d×i),O(n×d + k×d),✅ 已实现,IVFQueryBuilder.java:202-217
+查询构建,IVFQueryBuilder,field,"设置向量字段名","field: String - 字段名",IVFQueryBuilder - 构建器实例,O(1),O(1),✅ 已实现,IVFQueryBuilder.java:238-241
+查询构建,IVFQueryBuilder,vector,"设置查询向量","vector: float[] - 查询向量",IVFQueryBuilder - 构建器实例,O(1),O(d),✅ 已实现,IVFQueryBuilder.java:247-250
+查询构建,IVFQueryBuilder,nprobe,"设置搜索簇数","nprobe: int - 簇数量",IVFQueryBuilder - 构建器实例,O(1),O(1),✅ 已实现,IVFQueryBuilder.java:266-269
+查询构建,IVFQueryBuilder,k,"设置返回结果数","k: int - 结果数量",IVFQueryBuilder - 构建器实例,O(1),O(1),✅ 已实现,IVFQueryBuilder.java:275-278
+字段映射,VectorFieldMapper,parseCreateField,"解析并创建向量字段","context: ParseContext - 解析上下文",void,O(d + k×d),O(d),✅ 已实现,VectorFieldMapper.java:154-209
+字段映射,VectorFieldMapper,TypeParser.parse,"解析字段映射配置","name: String - 字段名
+node: Map<String, Object> - 配置节点
+parserContext: ParserContext - 解析上下文",Builder - 字段构建器,O(1),O(1),✅ 已实现,VectorFieldMapper.java:42-72
+向量字段,VectorField,构造函数 (List),"从 List<Float> 创建向量字段","name: String - 字段名
+vector: List<Float> - 向量列表",VectorField 实例,O(d),O(d),✅ 已实现,VectorField.java:30-33
+向量字段,VectorField,构造函数 (Array),"从 float[] 创建向量字段","name: String - 字段名
+vector: float[] - 向量数组",VectorField 实例,O(d),O(d),✅ 已实现,VectorField.java:41-44
+向量字段,VectorField,decodeVector,"从 BytesRef 解码向量","bytes: BytesRef - 字节数据",float[] - 向量数组,O(d),O(d),✅ 已实现,VectorField.java:66-73
+向量字段,VectorField,getVector,"获取向量数组",无,float[] - 向量数组,O(d),O(d),✅ 已实现,VectorField.java:79-81

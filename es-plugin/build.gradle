@@ -1,0 +1,25 @@
+apply plugin: 'java'
+
+ext {
+    elasticsearchVersion = '8.15.3'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "org.elasticsearch:elasticsearch:${elasticsearchVersion}"
+    implementation "org.apache.lucene:lucene-core:9.7.0"
+    testImplementation "org.elasticsearch.test:framework:${elasticsearchVersion}"
+    testImplementation 'junit:junit:4.13.2'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+test {
+    systemProperty 'tests.security.manager', 'false'
+}

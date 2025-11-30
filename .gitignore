@@ -1,0 +1,62 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+server/manager
+manager
+
+# Build artifacts
+es-plugin/build/
+es-plugin/.gradle/
+es-plugin/gradle/
+es-plugin/gradlew
+es-plugin/gradlew.bat
+*.zip
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Data files
+server/data/
+*.json
+!package.json
+!tsconfig.json
+
+# Temporary files
+/tmp/
+*.tmp
+*.bak
+
+# Environment files
+.env
+.env.local
+
+# Node modules
+node_modules/
+
+# Kubernetes secrets
+*-secret.yaml
+secrets/
+
+# Database
+*.db
+*.sqlite
+
+# Large binary files
+docker/go1.21.0.darwin-arm64.pkg
+docker/minikube-darwin-amd64
+docker/minikube-darwin-arm64
+*.pkg
+
+# OS specific
+Thumbs.db

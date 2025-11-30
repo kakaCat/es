@@ -1,0 +1,564 @@
+序号,接口分类,接口名称,HTTP方法,接口路径,功能描述,请求参数,请求体示例,响应参数,响应示例,实现状态,实现文件,详细实现说明,技术要点,数据流转,注意事项
+1,容器管理,创建容器组,POST,/clusters,创建新的 Elasticsearch 集群容器组,"tenant_org_id (string, 必填): 租户组织 ID - 用于多租户隔离
+user (string, 必填): 用户 ID - 唯一标识用户
+service_name (string, 必填): 服务名称 - 用户下的服务标识
+namespace (string, 可选): Kubernetes 命名空间，不提供则自动生成
+replicas (int, 必填): 副本数量 - StatefulSet 的 Pod 数量
+cpu_request (string): CPU 请求值，如 ""1"" 表示 1 核
+cpu_limit (string): CPU 限制值，如 ""2"" 表示最多 2 核
+mem_request (string): 内存请求值，如 ""2Gi""
+mem_limit (string): 内存限制值，如 ""4Gi""
+disk_size (string): 磁盘大小，如 ""50Gi"" - 用于 PVC
+gpu_count (int): GPU 数量 - 0 表示不使用 GPU
+dimension (int): 向量维度 - 用于 IVF 索引配置
+vector_count (int): 底库向量数 - 预估的向量总数
+gitlab_url (string, 可选): GitLab 配置地址 - 拉取 docker-compose.yml","{
+  ""tenant_org_id"": ""org-001"",
+  ""user"": ""alice"",
+  ""service_name"": ""vector-search"",
+  ""replicas"": 3,
+  ""cpu_request"": ""1"",
+  ""cpu_limit"": ""2"",
+  ""mem_request"": ""2Gi"",
+  ""mem_limit"": ""4Gi"",
+  ""disk_size"": ""50Gi"",
+  ""gpu_count"": 0,
+  ""dimension"": 128,
+  ""vector_count"": 1000000
+}","namespace (string): 创建的命名空间，格式: {tenant_org_id}-{user}-{service_name}
+status (string): 创建状态 - created/creating/error
+message (string): 状态消息 - 详细的操作结果
+replicas (int): 副本数量 - 确认创建的副本数
+resources (object): 资源配置信息
+  - cpu (string): CPU 配置 request/limit
+  - memory (string): 内存配置 request/limit
+  - disk (string): 磁盘大小","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""status"": ""created"",
+  ""message"": ""Cluster created successfully"",
+  ""replicas"": 3,
+  ""resources"": {
+    ""cpu"": ""1/2"",
+    ""memory"": ""2Gi/4Gi"",
+    ""disk"": ""50Gi""
+  }
+}",✅ 已实现,server/main.go:CreateClusterHandler (L150-250),"**实现流程：**
+1. **参数验证** - 检查 tenant_org_id、user、service_name 必填
+2. **命名空间生成** - 格式: {tenant_org_id}-{user}-{service_name}
+3. **配额检查** - 从元数据服务查询租户配额，验证 CPU、内存、集群数不超限
+4. **元数据优先保存** - 在创建 K8s 资源前先保存 TenantContainer 元数据，状态为 creating
+5. **部署状态上报 (starting)** - 第 1 次上报，记录开始创建
+6. **GitLab 拉取** (可选) - 如果提供 gitlab_url，拉取配置文件
+7. **创建 Namespace** - 打标签: es-cluster=true, tenant-org-id, user, service-name
+8. **部署状态上报 (namespace_created)** - 第 2 次上报
+9. **创建 StatefulSet** - 设置环境变量: CPU_REQUEST, CPU_LIMIT, MEM_REQUEST, MEM_LIMIT, DISK_SIZE, GPU_COUNT, DIMENSION, VECTOR_COUNT
+10. **创建 Service** - 类型 ClusterIP，端口 9200/9300
+11. **部署状态上报 (k8s_applied)** - 第 3 次上报
+12. **创建 PVC** - 每个 Pod 一个 PVC，大小为 disk_size
+13. **配置资源限制** - 应用 CPU/内存的 request 和 limit
+14. **部署状态上报 (resources_configured)** - 第 4 次上报
+15. **配置磁盘** - 验证 PVC 创建成功
+16. **部署状态上报 (disk_configured)** - 第 5 次上报
+17. **配置 GPU** (如果 gpu_count > 0) - 添加 GPU 资源请求
+18. **部署状态上报 (gpu_configured)** - 第 6 次上报
+19. **等待 Pod 就绪** - 轮询检查 Pod 状态，最多等待 5 分钟
+20. **部署状态上报 (rollout_completed)** - 第 7 次上报
+21. **同步租户容器管理** - 将创建信息同步到租户容器管理系统
+22. **部署状态上报 (tenant_synced)** - 第 8 次上报
+23. **更新元数据状态** - 状态改为 created
+24. **部署状态上报 (completed)** - 第 9 次上报，完成","**核心技术：**
+- Kubernetes Client-go API
+- StatefulSet 管理有状态服务
+- PVC 动态存储分配
+- 多租户命名空间隔离
+- 元数据优先保存策略（确保即使 K8s 失败也有记录）
+
+**关键配置：**
+- StatefulSet 保证 Pod 稳定标识
+- PVC 模板自动为每个 Pod 创建存储
+- 资源 requests 保证最小资源
+- 资源 limits 防止资源过度占用
+
+**监控集成：**
+- Prometheus 自动发现（通过 K8s annotations）
+- Pod 启动后自动开始采集指标
+
+**日志收集：**
+- Fluentd 自动收集容器日志
+- 日志打标签包含 namespace、pod、container 信息","**数据流：**
+用户请求 → Manager 验证 → 元数据服务（保存 TenantContainer） → 上报服务（starting） → K8s API（创建 Namespace） → 上报服务（namespace_created） → K8s API（创建 StatefulSet/Service/PVC） → 上报服务（k8s_applied, resources_configured, disk_configured） → 等待 Pod 就绪 → 上报服务（rollout_completed） → 元数据服务（同步租户容器） → 上报服务（tenant_synced） → 元数据服务（更新状态 created） → 上报服务（completed） → 返回用户
+
+**元数据存储：**
+- PostgreSQL: tenant_containers 表
+- 文件系统: server/data/tenant_{user}_{service}.json
+
+**上报记录：**
+- 文件: server/deployment_reports/{user}_{service}_{timestamp}.json
+- 日志: /tmp/deployment.log","**重要注意事项：**
+1. 命名空间必须全局唯一，格式固定
+2. 配额检查失败会拒绝创建，返回 400 错误
+3. 元数据必须先于 K8s 资源保存（防止创建失败时丢失记录）
+4. 部署过程共 9 次上报，用于详细追踪部署进度
+5. GPU 配置需要 K8s 节点支持 GPU
+6. StatefulSet 删除时 PVC 不会自动删除（需手动清理）
+7. 副本数建议 ≥3 保证高可用
+8. CPU/内存 limit 建议是 request 的 2 倍
+9. 创建失败会自动清理已创建的资源
+10. 支持幂等性：相同参数重复调用会返回已存在的集群"
+2,容器管理,删除容器组,DELETE,/clusters,删除指定的集群容器组,"namespace (string, 必填): 要删除的命名空间 - 精确匹配","{
+  ""namespace"": ""org-001-alice-vector-search""
+}","status (string): 删除状态 - success/error
+message (string): 状态消息 - 详细的删除结果
+deleted_resources (array): 已删除的资源列表
+  - StatefulSet
+  - Service
+  - PVC
+  - Namespace","{
+  ""status"": ""success"",
+  ""message"": ""Cluster deleted successfully"",
+  ""deleted_resources"": [
+    ""StatefulSet/elasticsearch"",
+    ""Service/elasticsearch"",
+    ""PVC/data-elasticsearch-0"",
+    ""PVC/data-elasticsearch-1"",
+    ""PVC/data-elasticsearch-2"",
+    ""Namespace/org-001-alice-vector-search""
+  ]
+}",✅ 已实现,server/main.go:DeleteClusterHandler (L260-320),"**实现流程：**
+1. **权限验证** - 验证请求的 namespace 是否属于当前用户（通过 tenant_org_id 和 user）
+2. **查询元数据** - 从元数据服务获取集群信息，确认存在
+3. **逻辑删除检查** - 检查是否已逻辑删除（deleted=true）
+4. **删除 StatefulSet** - 先删除 StatefulSet，触发 Pod 删除
+5. **等待 Pod 终止** - 等待所有 Pod 优雅终止（最多 30 秒）
+6. **删除 Service** - 删除 Service，释放 ClusterIP
+7. **删除 PVC** - 删除所有 PVC，清理持久化数据
+8. **删除 Namespace** - 删除命名空间（会级联删除所有资源）
+9. **更新部署状态** - 设置 status=deleted，记录删除时间
+10. **逻辑删除租户容器** - 设置 deleted=true, deleted_at=now，保留记录用于审计
+11. **清理索引元数据** - 删除该 namespace 下的所有索引元数据
+12. **清理监控数据** (可选) - 标记监控数据为已删除
+13. **返回删除结果** - 包含删除的资源列表","**核心技术：**
+- Kubernetes 资源级联删除
+- 优雅终止（Grace Period）
+- 逻辑删除（软删除）保留审计记录
+
+**删除顺序：**
+1. StatefulSet（停止创建新 Pod）
+2. Pod（等待优雅终止）
+3. Service（断开网络）
+4. PVC（清理数据）
+5. Namespace（清理所有残留资源）
+
+**安全机制：**
+- 多租户权限验证
+- 二次确认机制（可选）
+- 数据备份检查（可选）
+
+**逻辑删除：**
+- deleted 字段标记删除状态
+- deleted_at 记录删除时间
+- 保留元数据用于审计和恢复","**数据流：**
+用户请求 → Manager 验证权限 → 元数据服务（查询集群信息） → K8s API（删除 StatefulSet） → 等待 Pod 终止 → K8s API（删除 Service） → K8s API（删除 PVC） → K8s API（删除 Namespace） → 元数据服务（更新部署状态 deleted） → 元数据服务（逻辑删除 TenantContainer） → 元数据服务（删除索引元数据） → 返回用户
+
+**元数据更新：**
+- DeploymentStatus: status=deleted
+- TenantContainer: deleted=true, deleted_at=timestamp
+
+**资源清理：**
+- K8s 资源立即删除
+- 元数据逻辑删除（保留 30 天）
+- PVC 数据立即删除（不可恢复）","**重要注意事项：**
+1. 删除操作不可逆，数据无法恢复
+2. 建议删除前先备份数据
+3. PVC 删除会立即释放存储空间
+4. 逻辑删除的记录保留 30 天用于审计
+5. 删除失败会返回详细错误信息
+6. Namespace 删除可能需要 1-2 分钟完成
+7. 如果 Namespace 卡在 Terminating 状态，需要手动清理 finalizers
+8. 删除不会清理 Prometheus 中的历史监控数据
+9. 删除不会清理日志系统中的历史日志
+10. 支持强制删除（跳过优雅终止）"
+3,容器管理,查询服务列表,GET,/clusters,获取所有集群容器组列表,"tenant_org_id (string, 可选): 过滤租户组织
+user (string, 可选): 过滤用户
+service_name (string, 可选): 过滤服务名称
+status (string, 可选): 过滤状态 - running/creating/error
+page (int, 可选): 页码，默认 1
+page_size (int, 可选): 每页数量，默认 20",无,"total (int): 总集群数
+page (int): 当前页码
+page_size (int): 每页数量
+clusters (array): 集群列表
+  - namespace (string): 命名空间
+  - user (string): 用户 ID
+  - service_name (string): 服务名称
+  - tenant_org_id (string): 租户组织 ID
+  - status (string): 运行状态 - running/creating/error/stopped
+  - replicas (int): 副本数量
+  - cpu_usage (float): CPU 使用率 (%) - 实时数据
+  - memory_usage (float): 内存使用率 (%) - 实时数据
+  - disk_usage (float): 磁盘使用率 (%) - 实时数据
+  - qps (int): 每秒查询数 - 最近 1 分钟平均值
+  - pod_count (int): 运行中的 Pod 数量
+  - created_at (string): 创建时间 ISO8601 格式
+  - updated_at (string): 最后更新时间","{
+  ""total"": 15,
+  ""page"": 1,
+  ""page_size"": 20,
+  ""clusters"": [
+    {
+      ""namespace"": ""org-001-alice-vector-search"",
+      ""user"": ""alice"",
+      ""service_name"": ""vector-search"",
+      ""tenant_org_id"": ""org-001"",
+      ""status"": ""running"",
+      ""replicas"": 3,
+      ""cpu_usage"": 45.2,
+      ""memory_usage"": 68.5,
+      ""disk_usage"": 32.1,
+      ""qps"": 1200,
+      ""pod_count"": 3,
+      ""created_at"": ""2025-11-30T10:00:00Z"",
+      ""updated_at"": ""2025-11-30T12:00:00Z""
+    }
+  ]
+}",✅ 已实现,server/main.go:GetClustersHandler (L100-140),"**实现流程：**
+1. **解析查询参数** - 获取过滤条件和分页参数
+2. **权限过滤** - 根据用户权限自动过滤（普通用户只能看自己的集群）
+3. **查询元数据服务** - 获取 TenantContainer 列表（基础信息）
+4. **过滤逻辑删除** - 排除 deleted=true 的记录
+5. **应用过滤条件** - tenant_org_id、user、service_name、status 过滤
+6. **查询 K8s 实时状态** - 并行查询每个集群的 Pod 状态
+7. **查询监控指标** - 从 Prometheus 或元数据服务获取 CPU/内存/磁盘/QPS
+8. **合并数据** - 合并元数据、K8s 状态、监控指标
+9. **分页处理** - 根据 page 和 page_size 分页
+10. **排序** - 默认按创建时间降序
+11. **返回结果** - 包含总数和当前页数据","**核心技术：**
+- 多数据源聚合（元数据 + K8s + Prometheus）
+- 并行查询优化（goroutine）
+- 数据缓存（减少 K8s API 调用）
+
+**数据来源：**
+- 元数据服务: namespace, user, service_name, tenant_org_id, replicas, created_at
+- K8s API: status (实时 Pod 状态), pod_count
+- Prometheus: cpu_usage, memory_usage, disk_usage, qps
+- 监控缓存: 最近 1 分钟的平均值
+
+**性能优化：**
+- 批量查询 K8s 资源（减少 API 调用）
+- 监控数据缓存 30 秒
+- 并发查询不同集群的状态
+- 分页减少数据传输量
+
+**权限控制：**
+- 管理员：查看所有集群
+- 组织管理员：查看本组织所有集群
+- 普通用户：只查看自己的集群","**数据流：**
+用户请求 → Manager 解析参数 → 元数据服务（查询 TenantContainer 列表） → 过滤逻辑删除 → 应用过滤条件 → 并行查询（K8s API 获取 Pod 状态 + Prometheus 获取监控指标） → 合并数据 → 分页 → 排序 → 返回用户
+
+**查询优化：**
+- 元数据查询：单次查询获取所有基础信息
+- K8s 查询：批量查询多个 namespace 的 Pod
+- 监控查询：批量查询多个 namespace 的指标
+
+**缓存策略：**
+- K8s 状态缓存 10 秒（减少 API Server 压力）
+- 监控指标缓存 30 秒（Prometheus 查询较慢）
+- 总数缓存 60 秒（分页导航使用）","**重要注意事项：**
+1. 实时监控数据可能有 10-30 秒延迟
+2. 大量集群时建议使用分页（避免超时）
+3. status 字段综合了 K8s Pod 状态和元数据状态
+4. cpu_usage 等指标是平均值，不是瞬时值
+5. pod_count 可能小于 replicas（Pod 正在启动或故障）
+6. 查询参数支持组合使用（AND 关系）
+7. 返回数据按创建时间降序（最新的在前）
+8. 空结果返回空数组，不是 null
+9. 监控数据可能为 0（集群刚创建或无流量）
+10. 支持模糊搜索 service_name（通过 LIKE 查询）"
+4,容器管理,查询服务详情,GET,/clusters/{namespace},获取指定集群的详细信息,"namespace (path, 必填): 集群命名空间 - URL 路径参数
+include_pods (query, 可选): 是否包含 Pod 详情，默认 false
+include_events (query, 可选): 是否包含最近事件，默认 false",无,"namespace (string): 命名空间
+user (string): 用户 ID
+service_name (string): 服务名称
+tenant_org_id (string): 租户组织 ID
+replicas (int): 配置的副本数量
+cpu (object): CPU 配置
+  - request (string): CPU 请求
+  - limit (string): CPU 限制
+memory (object): 内存配置
+  - request (string): 内存请求
+  - limit (string): 内存限制
+disk (string): 磁盘大小
+gpu_count (int): GPU 数量
+dimension (int): 向量维度
+vector_count (int): 向量数量
+status (string): 运行状态 - running/creating/error/stopped
+cpu_usage (float): 当前 CPU 使用率 (%)
+memory_usage (float): 当前内存使用率 (%)
+disk_usage (float): 当前磁盘使用率 (%)
+qps (int): 当前每秒查询数
+qps_history (array): QPS 历史数据（最近 1 小时）
+  - timestamp (string): 时间点
+  - value (int): QPS 值
+pod_details (array): Pod 详情列表（如果 include_pods=true）
+  - name (string): Pod 名称
+  - status (string): Pod 状态
+  - node (string): 所在节点
+  - cpu_usage (float): Pod CPU 使用率
+  - memory_usage (float): Pod 内存使用率
+  - restart_count (int): 重启次数
+  - age (string): 运行时长
+events (array): 最近事件（如果 include_events=true）
+  - type (string): 事件类型 Normal/Warning
+  - reason (string): 事件原因
+  - message (string): 事件消息
+  - timestamp (string): 事件时间
+created_at (string): 创建时间
+updated_at (string): 最后更新时间","{
+  ""namespace"": ""org-001-alice-vector-search"",
+  ""user"": ""alice"",
+  ""service_name"": ""vector-search"",
+  ""tenant_org_id"": ""org-001"",
+  ""replicas"": 3,
+  ""cpu"": { ""request"": ""1"", ""limit"": ""2"" },
+  ""memory"": { ""request"": ""2Gi"", ""limit"": ""4Gi"" },
+  ""disk"": ""50Gi"",
+  ""gpu_count"": 0,
+  ""dimension"": 128,
+  ""vector_count"": 1000000,
+  ""status"": ""running"",
+  ""cpu_usage"": 45.2,
+  ""memory_usage"": 68.5,
+  ""disk_usage"": 32.1,
+  ""qps"": 1200,
+  ""qps_history"": [
+    {""timestamp"": ""12:00"", ""value"": 1200},
+    {""timestamp"": ""11:55"", ""value"": 1180}
+  ],
+  ""pod_details"": [
+    {
+      ""name"": ""elasticsearch-0"",
+      ""status"": ""Running"",
+      ""node"": ""node-1"",
+      ""cpu_usage"": 44.8,
+      ""memory_usage"": 67.2,
+      ""restart_count"": 0,
+      ""age"": ""2d5h""
+    }
+  ],
+  ""created_at"": ""2025-11-30T10:00:00Z"",
+  ""updated_at"": ""2025-11-30T12:00:00Z""
+}",✅ 已实现,server/main.go:GetClusterHandler (L330-420),"**实现流程：**
+1. **参数验证** - 检查 namespace 格式是否正确
+2. **权限验证** - 验证用户是否有权访问该 namespace
+3. **查询元数据** - 从元数据服务获取 TenantContainer 完整信息
+4. **检查存在性** - 如果不存在或已逻辑删除，返回 404
+5. **查询部署状态** - 从元数据服务获取 DeploymentStatus（status, updated_at）
+6. **查询 K8s StatefulSet** - 获取实时副本状态（ready/total）
+7. **查询 K8s Pods** - 获取所有 Pod 状态（如果 include_pods=true）
+8. **查询监控指标** - 从 Prometheus 查询当前和历史监控数据
+  - cpu_usage: 最近 1 分钟平均值
+  - memory_usage: 最近 1 分钟平均值
+  - disk_usage: 当前值
+  - qps: 最近 1 分钟平均值
+  - qps_history: 最近 1 小时，5 分钟粒度
+9. **查询 K8s Events** (如果 include_events=true) - 最近 50 个事件
+10. **计算衍生指标** - cpu_usage_percent, memory_usage_percent
+11. **合并所有数据** - 组装完整的响应对象
+12. **返回详细信息** - 包含配置、状态、监控、Pod 详情、事件","**核心技术：**
+- 多数据源深度聚合
+- 可选字段按需加载（减少不必要查询）
+- 历史数据查询（Prometheus PromQL）
+
+**数据来源：**
+- TenantContainer: 基础配置信息
+- DeploymentStatus: 部署状态和时间
+- K8s StatefulSet: 副本状态
+- K8s Pods: Pod 详细状态
+- K8s Events: 集群事件
+- Prometheus: 监控指标和历史数据
+
+**监控查询：**
+- 当前值：instant query
+- 历史数据：range query (最近 1 小时)
+- 聚合函数：avg_over_time (5m) - 5 分钟平均
+
+**性能优化：**
+- 按需加载 Pod 详情和事件（默认不查询）
+- 监控数据缓存 30 秒
+- 并行查询不同数据源
+- 限制历史数据范围（最多 24 小时）","**数据流：**
+用户请求 → Manager 验证权限 → 元数据服务（查询 TenantContainer） → 元数据服务（查询 DeploymentStatus） → K8s API（查询 StatefulSet） → K8s API（查询 Pods，可选） → K8s API（查询 Events，可选） → Prometheus（查询监控指标） → Prometheus（查询 QPS 历史，range query） → 合并所有数据 → 计算衍生指标 → 返回用户
+
+**查询顺序：**
+1. 元数据查询（最快，本地或数据库）
+2. K8s 查询（中等，集群内网络）
+3. Prometheus 查询（较慢，需要计算）
+
+**数据合并策略：**
+- 基础信息优先使用元数据（稳定）
+- 实时状态使用 K8s（准确）
+- 监控数据使用 Prometheus（专业）
+- 缺失数据使用默认值（0 或 null）","**重要注意事项：**
+1. namespace 必须精确匹配，不支持模糊查询
+2. 不存在的 namespace 返回 404 错误
+3. 逻辑删除的集群返回 404（deleted=true）
+4. include_pods=true 会增加查询时间（每个 Pod 一次 API 调用）
+5. include_events=true 只返回最近 50 个事件
+6. QPS 历史数据最多返回最近 24 小时
+7. Pod 详情包含重启次数（频繁重启需要关注）
+8. 事件类型 Warning 表示有问题需要处理
+9. cpu_usage 等指标是百分比（相对于 limit）
+10. 监控数据可能有 10-30 秒延迟
+11. 如果 Prometheus 不可用，监控字段返回 null
+12. 支持 CORS（跨域访问）
+13. 返回数据较大时考虑使用压缩（gzip）"
+5,向量检索,向量搜索 (ANN),POST,/{index_name}/_search,执行近似最近邻向量搜索,"query.ann.field (string, 必填): 向量字段名 - 必须是 vector 类型
+query.ann.vector (array, 必填): 查询向量 - 浮点数数组，维度必须匹配
+query.ann.algorithm (string, 可选): 算法类型 - 目前只支持 ivf，默认 ivf
+query.ann.nprobe (int, 可选): 搜索簇数 - 范围 1-nlist，默认 10，越大召回率越高但越慢
+query.ann.k (int, 可选): 返回结果数 - 从 IVF 索引返回的候选数，默认 10
+size (int, 可选): 最终返回文档数 - 可以小于 k，默认 10
+_source (array/bool, 可选): 返回字段控制 - true/false/字段数组
+from (int, 可选): 分页起始位置 - 默认 0（不建议用于向量搜索）
+filter (object, 可选): 结构化过滤条件 - 在向量搜索后应用","{
+  ""query"": {
+    ""ann"": {
+      ""field"": ""embedding"",
+      ""vector"": [0.1, 0.2, 0.3, ..., 0.128],
+      ""algorithm"": ""ivf"",
+      ""nprobe"": 10,
+      ""k"": 20
+    }
+  },
+  ""size"": 10,
+  ""_source"": [""title"", ""category""],
+  ""filter"": {
+    ""term"": {
+      ""category"": ""technology""
+    }
+  }
+}","took (int): 查询耗时（毫秒）- 包含 IVF 搜索和过滤时间
+timed_out (bool): 是否超时 - 默认超时 30 秒
+_shards (object): 分片信息
+  - total (int): 总分片数
+  - successful (int): 成功分片数
+  - failed (int): 失败分片数
+hits.total.value (int): 匹配文档总数
+hits.total.relation (string): 关系 - eq(精确)/gte(大于等于)
+hits.max_score (float): 最高相似度得分 - 分数越高越相似（L2 距离转换为得分）
+hits.hits (array): 结果文档列表
+  - _index (string): 索引名
+  - _id (string): 文档 ID
+  - _score (float): 相似度得分 - 1/(1+distance)，范围 0-1
+  - _source (object): 文档内容 - 根据 _source 参数控制
+ivf_stats (object): IVF 搜索统计（可选，debug=true 时返回）
+  - clusters_searched (int): 实际搜索的簇数
+  - candidates_count (int): 候选向量数
+  - exact_search_time_ms (float): 精确搜索时间","{
+  ""took"": 5,
+  ""timed_out"": false,
+  ""_shards"": {
+    ""total"": 1,
+    ""successful"": 1,
+    ""failed"": 0
+  },
+  ""hits"": {
+    ""total"": {
+      ""value"": 10,
+      ""relation"": ""eq""
+    },
+    ""max_score"": 0.95,
+    ""hits"": [
+      {
+        ""_index"": ""my_vectors"",
+        ""_id"": ""42"",
+        ""_score"": 0.95,
+        ""_source"": {
+          ""title"": ""Document 42"",
+          ""category"": ""technology""
+        }
+      }
+    ]
+  }
+}",✅ 已实现,es-plugin/IVFQueryBuilder.java:doToQuery() (L107-130),"**IVF 搜索流程：**
+1. **查询解析** - Elasticsearch 解析 ann 查询 DSL
+2. **获取 IVF 索引** - 从缓存或磁盘加载 IVF 索引
+  - 索引名称: {index_name}_{field_name}
+  - 缓存 key: 使用 ConcurrentHashMap
+  - 磁盘路径: /tmp/es-ivf-indexes/{index_name}.ivf
+3. **检查训练状态** - 如果索引未训练，返回空结果并警告
+4. **计算到聚类中心距离** - 查询向量 vs 所有 centroids
+  - 使用配置的距离度量（L2/Cosine/Dot）
+  - 时间复杂度: O(nlist × dimension)
+5. **选择最近的 nprobe 个簇** - 排序并选择 Top-nprobe
+  - L2: 距离越小越好（升序）
+  - Cosine/Dot: 相似度越大越好（降序）
+6. **加载倒排列表** - 从选中的簇中获取所有候选向量
+  - 平均每簇向量数: total_vectors / nlist
+  - 候选数: nprobe × (total_vectors / nlist)
+7. **精确距离计算** - 计算查询向量到所有候选向量的距离
+  - 时间复杂度: O(candidates × dimension)
+8. **排序和截断** - 按距离/相似度排序，取 Top-k
+9. **转换为 Lucene Query** - 创建 BooleanQuery，包含所有匹配 doc ID
+  - 每个结果创建一个 TermQuery(_id)
+  - 使用 SHOULD 子句（OR 关系）
+10. **应用过滤条件** (如果有) - Elasticsearch 应用结构化过滤
+11. **返回结果** - 返回最终的 Top-size 文档","**核心技术：**
+- **IVF 算法** - Inverted File Index，倒排文件索引
+- **KMeans 聚类** - 将向量空间分割为 nlist 个簇
+- **两阶段搜索** - 粗排（簇选择） + 精排（精确距离）
+- **索引缓存** - 内存缓存避免重复加载
+- **序列化持久化** - Java 序列化保存索引
+
+**距离度量：**
+- L2: 欧氏距离，适合绝对距离重要的场景
+- Cosine: 余弦相似度，适合方向重要的场景
+- Dot Product: 点积，适合归一化向量
+
+**性能特点：**
+- 时间复杂度: O(nlist×d + nprobe×m×d + m×log(m))
+  - nlist×d: 计算到聚类中心距离
+  - nprobe×m×d: 候选向量精确计算
+  - m×log(m): 排序
+- 空间复杂度: O(n×d + nlist×d)
+  - n×d: 存储所有向量
+  - nlist×d: 存储聚类中心
+
+**参数调优：**
+- nlist: 聚类数，推荐 √n 到 4×√n
+- nprobe: 搜索簇数，推荐 nlist 的 5%-20%
+- nprobe=1: 最快，召回率 ~60%
+- nprobe=nlist/2: 较慢，召回率 ~95%","**数据流：**
+用户请求 → Elasticsearch 解析查询 → IVFQueryBuilder.doToQuery() → 获取 IVF 索引（缓存或加载） → 计算查询向量到 centroids 距离 → 选择最近 nprobe 个簇 → 加载这些簇的倒排列表 → 计算查询向量到候选向量的距离 → 排序得到 Top-k → 创建 BooleanQuery → Elasticsearch 执行查询 → 应用过滤条件 → 返回 Top-size 结果
+
+**索引加载：**
+1. 检查缓存（indexCache.get）
+2. 如果缓存命中，直接使用
+3. 如果缓存未命中，从磁盘加载
+4. 反序列化 IVF 索引对象
+5. 放入缓存
+6. 检查是否已训练（isTrained）
+
+**搜索优化：**
+- 批量计算距离（向量化）
+- 早停策略（可选）
+- 缓存聚类中心（避免重复计算）
+
+**得分转换：**
+- L2 距离转得分: score = 1 / (1 + distance)
+- Cosine 相似度: score = (similarity + 1) / 2
+- Dot Product: score = dot_product（需归一化）","**重要注意事项：**
+1. **索引必须先训练** - 调用 trainIndex() 或插入足够向量后自动训练
+2. **向量维度必须匹配** - 查询向量维度 = 索引配置维度
+3. **nprobe 越大越慢** - 线性关系，nprobe=10 约 10ms，nprobe=50 约 50ms
+4. **召回率权衡** - nprobe=5 召回率 ~70%，nprobe=20 召回率 ~90%
+5. **k 和 size 的区别** - k 是 IVF 返回候选数，size 是最终返回数，k ≥ size
+6. **结构化过滤在向量搜索后** - 先 ANN 找 k 个，再过滤，可能导致结果 < size
+7. **索引缓存占用内存** - 大索引建议限制缓存大小
+8. **持久化路径可配置** - 通过 es.path.data 系统属性
+9. **分页不推荐** - 向量搜索结果不稳定，不适合翻页
+10. **超时设置** - 默认 30 秒，可通过 timeout 参数调整
+11. **并发安全** - 索引缓存使用 ConcurrentHashMap，读写安全
+12. **索引更新** - 添加向量后需要重新训练（或增量更新）
+13. **距离度量不可变** - 索引创建后不能更改度量类型
+14. **空结果处理** - 如果索引为空或未训练，返回 MatchAllDocsQuery
+15. **错误处理** - 维度不匹配、索引不存在等返回详细错误信息"

@@ -1,0 +1,3 @@
+resources:
+  - register-repo-job.yaml
+  - snapshot-cronjob.yaml

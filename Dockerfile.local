@@ -1,0 +1,20 @@
+FROM postgres:15
+
+WORKDIR /app
+
+# Copy the pre-built Linux AMD64 binary
+COPY server/manager /app/manager
+
+# Copy scripts and k8s configs
+COPY scripts /app/scripts
+COPY k8s /app/k8s
+
+# Set execute permissions
+RUN chmod +x /app/manager && \
+    chmod +x /app/scripts/*.sh 2>/dev/null || true
+
+ENV PATH="/usr/local/bin:${PATH}"
+
+EXPOSE 8080
+
+CMD ["/app/manager"]

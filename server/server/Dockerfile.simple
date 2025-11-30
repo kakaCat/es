@@ -1,0 +1,21 @@
+FROM alpine:3.20
+RUN apk add --no-cache bash curl ca-certificates postgresql-client
+
+# Install kubectl
+ARG KUBECTL_VERSION=v1.30.3
+RUN curl -fsSL -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
+    chmod +x /usr/local/bin/kubectl
+
+WORKDIR /app
+
+# Copy pre-built binary
+COPY server/manager /app/manager
+COPY scripts /app/scripts  
+COPY k8s /app/k8s
+
+# Set execute permissions
+RUN chmod +x /app/manager /app/scripts/cluster.sh
+
+ENV PATH="/usr/local/bin:${PATH}"
+EXPOSE 8080
+CMD ["/app/manager"]

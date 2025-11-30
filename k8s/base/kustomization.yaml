@@ -1,0 +1,11 @@
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - elasticsearch-configmap.yaml
+  - elasticsearch-statefulset.yaml
+  - elasticsearch-service.yaml
+  - elasticsearch-headless-service.yaml
+  - kibana-deployment.yaml
+  - kibana-service.yaml
+  - manager-deployment.yaml
+  - manager-service.yaml
