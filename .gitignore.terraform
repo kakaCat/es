@@ -1,0 +1,248 @@
+# Terraform .gitignore
+# 这是 Terraform/Helm 项目推荐的 .gitignore 配置
+# 将此内容添加到项目的 .gitignore 文件中
+
+# ============================================
+# Terraform 相关
+# ============================================
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data
+# such as password, private keys, and other secrets
+*.tfvars
+*.tfvars.json
+
+# Keep the example file
+!terraform.tfvars.example
+
+# Ignore override files as they are usually used to override resources locally
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform lock file (you may want to commit this in some cases)
+# 如果团队使用统一的 provider 版本,可以提交此文件
+# 否则保持忽略
+.terraform.lock.hcl
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# ============================================
+# 租户配置 (自动生成)
+# ============================================
+
+# 租户配置目录 (由 create-tenant.sh 自动生成)
+terraform/tenants/*
+!terraform/tenants/.gitkeep
+
+# ============================================
+# Helm 相关
+# ============================================
+
+# Helm dependencies
+helm/*/charts/
+helm/*/Chart.lock
+
+# Packaged charts
+*.tgz
+
+# ============================================
+# 备份和临时文件
+# ============================================
+
+# 备份目录
+backups/
+*.backup
+*.bak
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# ============================================
+# IDE 和编辑器
+# ============================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# 日志和输出
+# ============================================
+
+# 日志文件
+*.log
+
+# Debug 输出
+debug/
+*.debug
+
+# ============================================
+# Kubernetes 相关
+# ============================================
+
+# Kubeconfig (如果在项目中)
+kubeconfig
+*.kubeconfig
+
+# Kubernetes secrets (不应该提交)
+secrets/
+*.secret.yaml
+
+# ============================================
+# 构建产物
+# ============================================
+
+# Go 构建产物
+server/manager
+server/*.exe
+server/*.dll
+server/*.so
+server/*.dylib
+
+# Java 构建产物
+es-plugin/build/
+es-plugin/.gradle/
+es-plugin/gradle/
+es-plugin/gradlew
+es-plugin/gradlew.bat
+
+# Python 产物
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node.js 产物
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============================================
+# 测试和覆盖率
+# ============================================
+
+# 测试结果
+*.test
+test-results/
+coverage/
+*.cover
+.coverage
+
+# ============================================
+# 文档生成
+# ============================================
+
+# Generated docs
+site/
+docs/_build/
+
+# ============================================
+# 环境变量
+# ============================================
+
+# Environment files (可能包含敏感信息)
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# 压缩文件
+# ============================================
+
+*.zip
+*.tar.gz
+*.tar
+*.rar
+
+# 但保留 ES plugin zip (如果需要)
+# !es-plugin/build/distributions/*.zip
+
+# ============================================
+# 数据目录
+# ============================================
+
+# Server 数据目录
+server/data/*
+!server/data/.gitkeep
+
+# ============================================
+# macOS
+# ============================================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ============================================
+# Windows
+# ============================================
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================================
+# Linux
+# ============================================
+
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
