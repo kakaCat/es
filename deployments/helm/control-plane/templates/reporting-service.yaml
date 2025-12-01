@@ -1,0 +1,21 @@
+{{- if .Values.reportingService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-reporting
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-reporting
+    component: reporting
+    {{- include "control-plane.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.reportingService.service.type }}
+  ports:
+    - port: {{ .Values.reportingService.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Release.Name }}-reporting
+    component: reporting
+{{- end }}

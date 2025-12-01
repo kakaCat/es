@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: es-serverless
+data:
+  backup-es-snapshot.sh: |
+    #!/bin/bash
+    # 创建 Elasticsearch 快照，按租户隔离存储
+
+    set -euo pipefail
+
+    # 环境变量
+    ES_HOST=${ES_HOST:-"localhost:9200"}
+    MINIO_ENDPOINT=${MINIO_ENDPOINT:-"minio:9000"}
+    MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-"es_minio"}
+    MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-"es_minio_P@ssw0rd_2025_11_28"}
+    NAMESPACE=${NAMESPACE:-""}
+    TENANT_ORG_ID=${TENANT_ORG_ID:-""}
+
+    # 如果没有提供命名空间和租户组织ID，则退出
+    if [[ -z "$NAMESPACE" || -z "$TENANT_ORG_ID" ]]; then
+        echo "Error: NAMESPACE and TENANT_ORG_ID must be provided"
+        exit 1
+    fi
+
+    # 创建按租户隔离的存储桶路径
+    BUCKET_NAME="es-backups"
+    TENANT_PATH="$TENANT_ORG_ID/$NAMESPACE"
+
+    echo "Creating Elasticsearch snapshot for namespace: $NAMESPACE"
+    echo "Tenant Org ID: $TENANT_ORG_ID"
+    echo "Storage path: $BUCKET_NAME/$TENANT_PATH"
+
+    # 1. 注册快照仓库（按租户隔离）
+    curl -X PUT "$ES_HOST/_snapshot/${TENANT_ORG_ID}_${NAMESPACE}" \
+      -H 'Content-Type: application/json' \
+      -d "{
+        \"type\": \"s3\",
+        \"settings\": {
+          \"bucket\": \"$BUCKET_NAME\",
+          \"client\": \"default\",
+          \"base_path\": \"$TENANT_PATH\",
+          \"endpoint\": \"$MINIO_ENDPOINT\",
+          \"protocol\": \"http\",
+          \"access_key\": \"$MINIO_ACCESS_KEY\",
+          \"secret_key\": \"$MINIO_SECRET_KEY\"
+        }
+      }"
+
+    # 2. 创建快照
+    SNAPSHOT_NAME="snapshot_$(date +%Y%m%d_%H%M%S)_${NAMESPACE}"
+    echo "Creating snapshot: $SNAPSHOT_NAME"
+    curl -X PUT "$ES_HOST/_snapshot/${TENANT_ORG_ID}_${NAMESPACE}/$SNAPSHOT_NAME?wait_for_completion=true" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "indices": "*",
+        "ignore_unavailable": true,
+        "include_global_state": false
+      }'
+
+    # 3. 验证快照创建成功
+    echo "Verifying snapshot creation..."
+    curl -X GET "$ES_HOST/_snapshot/${TENANT_ORG_ID}_${NAMESPACE}/$SNAPSHOT_NAME"
+
+    echo "Snapshot created successfully for namespace: $NAMESPACE"
+    echo "Tenant Org ID: $TENANT_ORG_ID"
+    echo "Snapshot name: $SNAPSHOT_NAME"
+
+  restore-from-snapshot.sh: |
+    #!/bin/bash
+    # 从快照恢复数据，支持按租户隔离的存储
+
+    set -euo pipefail
+
+    # 环境变量
+    ES_HOST=${ES_HOST:-"localhost:9200"}
+    MINIO_ENDPOINT=${MINIO_ENDPOINT:-"minio:9000"}
+    MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-"es_minio"}
+    MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-"es_minio_P@ssw0rd_2025_11_28"}
+    NAMESPACE=${NAMESPACE:-""}
+    TENANT_ORG_ID=${TENANT_ORG_ID:-""}
+    SNAPSHOT_NAME=${SNAPSHOT_NAME:-""}
+
+    # 检查必需参数
+    if [[ -z "$NAMESPACE" || -z "$TENANT_ORG_ID" ]]; then
+        echo "Error: NAMESPACE and TENANT_ORG_ID must be provided"
+        exit 1
+    fi
+
+    # 创建按租户隔离的存储桶路径
+    BUCKET_NAME="es-backups"
+    TENANT_PATH="$TENANT_ORG_ID/$NAMESPACE"
+    REPOSITORY_NAME="${TENANT_ORG_ID}_${NAMESPACE}"
+
+    echo "Restoring Elasticsearch snapshot for namespace: $NAMESPACE"
+    echo "Tenant Org ID: $TENANT_ORG_ID"
+    echo "Storage path: $BUCKET_NAME/$TENANT_PATH"
+
+    # 1. 注册快照仓库（按租户隔离）
+    echo "Registering snapshot repository..."
+    curl -X PUT "$ES_HOST/_snapshot/$REPOSITORY_NAME" \
+      -H 'Content-Type: application/json' \
+      -d "{
+        \"type\": \"s3\",
+        \"settings\": {
+          \"bucket\": \"$BUCKET_NAME\",
+          \"client\": \"default\",
+          \"base_path\": \"$TENANT_PATH\",
+          \"endpoint\": \"$MINIO_ENDPOINT\",
+          \"protocol\": \"http\",
+          \"access_key\": \"$MINIO_ACCESS_KEY\",
+          \"secret_key\": \"$MINIO_SECRET_KEY\"
+        }
+      }"
+
+    # 2. 如果提供了快照名称，则恢复指定快照，否则列出可用快照
+    if [[ -n "$SNAPSHOT_NAME" ]]; then
+        echo "Restoring snapshot: $SNAPSHOT_NAME"
+        curl -X POST "$ES_HOST/_snapshot/$REPOSITORY_NAME/$SNAPSHOT_NAME/_restore" \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "indices": "*",
+            "ignore_unavailable": true,
+            "include_global_state": false
+          }'
+        
+        echo "Restore initiated for snapshot: $SNAPSHOT_NAME"
+    else
+        echo "Listing available snapshots..."
+        curl -X GET "$ES_HOST/_snapshot/$REPOSITORY_NAME/_all"
+    fi
+
+    echo "Restore process completed for namespace: $NAMESPACE"
+
+  backup-metadata.sh: |
+    #!/bin/bash
+    # 备份 PostgreSQL 元数据，按租户隔离存储
+
+    set -euo pipefail
+
+    # 环境变量
+    DB_HOST=${DB_HOST:-"postgres"}
+    DB_PORT=${DB_PORT:-"5432"}
+    DB_USER=${DB_USER:-"es_user"}
+    DB_PASSWORD=${DB_PASSWORD:-"es_password_2025"}
+    DB_NAME=${DB_NAME:-"es_metadata"}
+    MINIO_ENDPOINT=${MINIO_ENDPOINT:-"minio:9000"}
+    MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-"es_minio"}
+    MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-"es_minio_P@ssw0rd_2025_11_28"}
+    TENANT_ORG_ID=${TENANT_ORG_ID:-"all"}
+
+    # 设置环境变量用于pg_dump
+    export PGPASSWORD=$DB_PASSWORD
+
+    echo "Backing up metadata for tenant: $TENANT_ORG_ID"
+
+    # 创建备份文件名
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_FILE="metadata_backup_${TENANT_ORG_ID}_${TIMESTAMP}.sql"
+
+    # 1. 备份 PostgreSQL 元数据
+    if [[ "$TENANT_ORG_ID" == "all" ]]; then
+        echo "Backing up all metadata..."
+        pg_dump -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME > $BACKUP_FILE
+    else
+        echo "Backing up metadata for tenant: $TENANT_ORG_ID"
+        # 只备份特定租户的数据
+        pg_dump -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME \
+            -t "tenant_containers" \
+            -t "index_metadata" \
+            -t "tenant_quota" \
+            -t "deployment_status" \
+            --where="tenant_org_id = '$TENANT_ORG_ID'" > $BACKUP_FILE
+    fi
+
+    # 2. 加密备份文件
+    ENCRYPTED_FILE="${BACKUP_FILE}.enc"
+    echo "Encrypting backup file..."
+    openssl enc -aes-256-cbc -salt \
+        -in $BACKUP_FILE \
+        -out $ENCRYPTED_FILE \
+        -k $DB_PASSWORD
+
+    # 3. 上传到 MinIO（按租户隔离）
+    echo "Uploading to MinIO..."
+    # 使用mc命令上传文件
+    mc alias set minio-local http://$MINIO_ENDPOINT $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
+    mc mb -p minio-local/es-backups/metadata/$TENANT_ORG_ID
+    mc cp $ENCRYPTED_FILE minio-local/es-backups/metadata/$TENANT_ORG_ID/
+
+    # 4. 清理本地文件
+    rm $BACKUP_FILE $ENCRYPTED_FILE
+
+    echo "Metadata backup completed for tenant: $TENANT_ORG_ID"
+    echo "Backup file: $ENCRYPTED_FILE"
+    echo "Uploaded to: es-backups/metadata/$TENANT_ORG_ID/"

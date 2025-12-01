@@ -1,0 +1,52 @@
+{{- if .Values.manager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-manager
+    component: manager
+    {{- include "control-plane.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-manager
+      component: manager
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-manager
+        component: manager
+        {{- include "control-plane.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: manager
+          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- toYaml .Values.manager.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.manager.persistence.enabled }}
+            - name: data
+              mountPath: {{ .Values.manager.persistence.mountPath }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.manager.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.manager.readinessProbe | nindent 12 }}
+      volumes:
+        {{- if .Values.manager.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-manager-data
+        {{- end }}
+{{- end }}

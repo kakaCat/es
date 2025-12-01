@@ -44,7 +44,7 @@ ES Serverless Platform 是一个完全托管的 Elasticsearch 平台，提供：
    kubectl get nodes
    ```
 
-如遇 Kubernetes 配置问题，请参考 [Kubernetes 问题排查](docs/archive/2025-12-01-project-cleanup/KUBERNETES_SETUP_ISSUES.md)。
+如遇 Kubernetes 配置问题，请参考 [KUBERNETES_SETUP_ISSUES.md](KUBERNETES_SETUP_ISSUES.md)。
 
 ## ✨ 核心特性
 
@@ -68,8 +68,6 @@ ES Serverless Platform 是一个完全托管的 Elasticsearch 平台，提供：
 - 💾 **自动备份**：ES 快照和元数据自动备份到 MinIO/S3 ([灾难恢复](docs/operations/disaster-recovery.md))
 - 🗄️ **双存储模式**：支持 PostgreSQL 或文件系统存储元数据
 - 🔐 **安全认证**：支持 Token 认证和访问审计
-
----
 
 ## 📦 部署指南
 
@@ -118,8 +116,6 @@ terraform apply
 
 **📚 完整对比和选择指南**: 查看 [部署总览](docs/deployment/README.md)
 
----
-
 ## 💻 本地开发
 
 ### 控制平面开发
@@ -160,8 +156,6 @@ python -m http.server 8000
 - 多租户管理
 
 👉 **详细开发指南**: [开发环境搭建](docs/development/setup.md)
-
----
 
 ## 🏗️ 系统架构
 
@@ -210,90 +204,3 @@ ES Serverless Platform 采用三层架构设计：
 - `GET /qps/{namespace}` - QPS 指标
 
 👉 **完整 API 文档**: [REST API 参考](docs/api.md)
-
----
-
-## 📂 项目结构
-
-```
-es-paas/es/
-├── src/                          # 💻 源代码
-│   ├── control-plane/            # Go 控制平面服务
-│   ├── es-plugin/                # ES IVF 向量搜索插件
-│   └── frontend/                 # Web 管理界面
-│
-├── deployments/                  # 🚀 部署配置
-│   ├── terraform/                # Terraform IaC
-│   ├── helm/                     # Helm Charts
-│   ├── kubernetes/               # K8s YAML
-│   └── docker/                   # Docker Compose
-│
-├── scripts/                      # 🛠️ 工具脚本
-│   ├── deploy/                   # 部署脚本
-│   ├── build/                    # 构建脚本
-│   ├── ops/                      # 运维脚本
-│   └── dev/                      # 开发辅助
-│
-├── docs/                         # 📚 文档中心
-│   ├── architecture/             # 架构设计
-│   ├── deployment/               # 部署指南
-│   ├── development/              # 开发文档
-│   ├── operations/               # 运维手册
-│   ├── api/                      # API 文档
-│   └── archive/                  # 归档文档
-│
-├── tests/                        # 🧪 测试
-├── examples/                     # 📖 示例代码
-└── configs/                      # ⚙️ 配置文件
-```
-
-👉 **详细说明**: [项目结构说明](PROJECT_STRUCTURE.md)
-
----
-
-## 📚 文档导航
-
-### 新用户推荐阅读
-1. [系统架构总览](docs/architecture.md) - 了解系统设计
-2. [部署总览](docs/deployment/README.md) - 选择部署方式
-3. [开发环境搭建](docs/development/setup.md) - 开始开发
-
-### 按角色查找
-- **开发人员**: [开发指南](docs/development/) | [API 文档](docs/api.md)
-- **运维人员**: [部署指南](docs/deployment/) | [运维手册](docs/operations/)
-- **架构师**: [架构设计](docs/architecture/) | [系统架构](docs/architecture.md)
-
-### 核心文档
-- [多租户架构](docs/architecture/multi-tenancy.md)
-- [分片复制机制](docs/architecture/shard-replication.md)
-- [自动扩展与配额](docs/architecture/auto-scaling.md)
-- [监控与告警](docs/operations/monitoring.md)
-- [灾难恢复手册](docs/operations/disaster-recovery.md)
-
----
-
-## 🤝 贡献指南
-
-欢迎贡献代码和文档！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
-
----
-
-## 📄 许可证
-
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
-
----
-
-## 🔗 相关链接
-
-- [项目结构说明](PROJECT_STRUCTURE.md)
-- [文档中心](docs/README.md)
-- [Kubernetes 问题排查](docs/archive/2025-12-01-project-cleanup/KUBERNETES_SETUP_ISSUES.md)
-- [项目整理归档](docs/archive/2025-12-01-project-cleanup/) - v2.0 重构记录
-- [CLAUDE.md](CLAUDE.md) - AI 助手配置
-
----
-
-**版本历史**:
-- v2.0 (2025-12-01) - 项目结构标准化重构
-- v1.0 (2025-11-01) - 初始版本发布

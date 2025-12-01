@@ -1,0 +1,4 @@
+namespace: es-serverless
+resources:
+  - cronjob.yaml
+  - configmap.yaml

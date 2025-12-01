@@ -1,0 +1,121 @@
+# Manager service configuration
+manager:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: es-serverless-manager
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  env:
+    - name: ELASTICSEARCH_URL
+      value: "http://elasticsearch:9200"
+    - name: USE_POSTGRES
+      value: "false"
+    - name: DATA_DIR
+      value: "/data"
+
+  persistence:
+    enabled: true
+    storageClass: "hostpath"
+    size: 5Gi
+    mountPath: /data
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+# Shard Controller configuration
+shardController:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: shard-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  env:
+    - name: ELASTICSEARCH_URL
+      value: "http://elasticsearch:9200"
+    - name: CHECK_INTERVAL
+      value: "30s"
+
+# Reporting Service configuration
+reportingService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: reporting-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8081
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  env:
+    - name: MANAGER_URL
+      value: "http://es-serverless-manager:8080"
+    - name: REPORT_INTERVAL
+      value: "60s"
+
+# Service account
+serviceAccount:
+  create: true
+  name: es-control-plane
+
+# RBAC configuration
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["namespaces", "pods", "services", "persistentvolumeclaims"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["statefulsets", "deployments"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/part-of: es-serverless-platform

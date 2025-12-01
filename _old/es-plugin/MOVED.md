@@ -1,0 +1,39 @@
+# 📦 目录已迁移
+
+此目录 `es-plugin/` 已迁移到新位置。
+
+## ✅ 新位置
+
+```
+es-plugin/ → src/es-plugin/
+```
+
+## 📖 为什么迁移？
+
+项目已进行标准化重构，采用更清晰的目录结构：
+- `src/` - 所有源代码
+- `deployments/` - 所有部署配置
+- `scripts/` - 工具脚本（按功能分类）
+- `docs/` - 文档中心（按类型分类）
+
+## 🛠️ 构建插件
+
+新路径下的构建命令：
+
+```bash
+cd src/es-plugin
+./gradlew build
+
+# 插件输出位于
+# build/distributions/es-ivf-plugin-*.zip
+```
+
+## 🔗 更多信息
+
+查看完整的项目结构说明：
+- [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md)
+- [ES 插件开发文档](../docs/development/es-plugin.md)
+
+---
+
+**注意**：此目录仅保留用于向后兼容，后续版本可能移除。请尽快更新您的引用路径。

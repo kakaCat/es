@@ -1,0 +1,33 @@
+{{- if .Values.shardController.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-shard-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-shard-controller
+    component: shard-controller
+    {{- include "control-plane.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.shardController.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-shard-controller
+      component: shard-controller
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-shard-controller
+        component: shard-controller
+        {{- include "control-plane.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: shard-controller
+          image: "{{ .Values.shardController.image.repository }}:{{ .Values.shardController.image.tag }}"
+          imagePullPolicy: {{ .Values.shardController.image.pullPolicy }}
+          env:
+            {{- toYaml .Values.shardController.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.shardController.resources | nindent 12 }}
+{{- end }}

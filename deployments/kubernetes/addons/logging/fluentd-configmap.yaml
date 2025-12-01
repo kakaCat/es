@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: es-serverless
+data:
+  fluent.conf: |
+    @include systemd.conf
+    @include kubernetes.conf
+    
+    <label @DISPATCH>
+      <filter **>
+        @type record_transformer
+        <record>
+          hostname ${hostname}
+          node_name ${ENV['NODE_NAME']}
+        </record>
+        enable_ruby
+      </filter>
+      
+      <filter kubernetes.**>
+        @type grep
+        <regexp>
+          key $.kubernetes.namespace_name
+          pattern ^(es-serverless)$
+        </regexp>
+      </filter>
+      
+      <match **>
+        @type copy
+        <store>
+          @type elasticsearch
+          @log_level info
+          include_tag_key true
+          host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+          port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+          scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+          logstash_format true
+          logstash_prefix k8s-${ENV['NODE_NAME'] || 'default'}
+          reconnect_on_error true
+          reload_on_failure true
+          reload_connections false
+          <buffer>
+            @type file
+            path /var/log/fluentd-buffers/kubernetes.system.buffer
+            flush_mode interval
+            retry_type exponential_backoff
+            flush_thread_count 2
+            flush_interval 5s
+            retry_forever
+            retry_max_interval 30
+            chunk_limit_size 2M
+            queue_limit_length 8
+            overflow_action block
+          </buffer>
+        </store>
+        
+        <store>
+          @type file
+          @log_level debug
+          path /var/log/fluentd-all.log
+          append true
+          <buffer>
+            @type file
+            path /var/log/fluentd-buffers/all.log.buffer
+            flush_mode interval
+            flush_interval 10s
+          </buffer>
+        </store>
+      </match>
+    </label>
+  
+  kubernetes.conf: |
+    <source>
+      @type tail
+      @id in_tail_container_logs
+      @label @KUBERNETES
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      read_from_head true
+      refresh_interval 60
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+      emit_unmatched_lines true
+    </source>
+    
+    <source>
+      @type tail
+      @id in_tail_es_logs
+      @label @KUBERNETES
+      path /var/log/containers/*elasticsearch*.log
+      pos_file /var/log/fluentd-es.log.pos
+      tag elasticsearch
+      read_from_head true
+      refresh_interval 60
+      <parse>
+        @type multiline
+        format_firstline /^\d{4}-\d{2}-\d{2}/
+        format1 /^(?<time>\d{4}-\d{2}-\d{2}[ ]\d{2}:\d{2}:\d{2}\.\d{3})[ ][A-Z][ ](?<message>.*)/
+        time_format %Y-%m-%d %H:%M:%S.%L
+      </parse>
+    </source>
+    
+    <label @KUBERNETES>
+      <filter kubernetes.**>
+        @type kubernetes_metadata
+        @id filter_kube_metadata
+        kubernetes_url "#{ENV['KUBERNETES_URL'] || 'https://kubernetes.default.svc:443'}"
+        bearer_token_file /var/run/secrets/kubernetes.io/serviceaccount/token
+        ca_file /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        cache_size 1000
+        watch false
+        use_journal false
+      </filter>
+      
+      <filter kubernetes.**>
+        @type record_transformer
+        <record>
+          kubernetes_ns ${record["kubernetes"]["namespace_name"]}
+          kubernetes_pod ${record["kubernetes"]["pod_name"]}
+          kubernetes_container ${record["kubernetes"]["container_name"]}
+        </record>
+      </filter>
+      
+      <match kubernetes.**>
+        @type relabel
+        @label @DISPATCH
+      </match>
+      
+      <match elasticsearch>
+        @type relabel
+        @label @DISPATCH
+      </match>
+    </label>
+    
+  systemd.conf: |
+    <source>
+      @type systemd
+      @id in_systemd_kubelet
+      @label @SYSTEMD
+      filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+      pos_file /var/log/fluentd-journald-kubelet.pos
+      path /run/log/journal
+      tag kubelet
+      read_from_head true
+    </source>
+    
+    <source>
+      @type systemd
+      @id in_systemd_kernel
+      @label @SYSTEMD
+      filters [{ "_SYSTEMD_UNIT": "kernel.service" }]
+      pos_file /var/log/fluentd-journald-kernel.pos
+      path /run/log/journal
+      tag kernel
+      read_from_head true
+    </source>
+    
+    <label @SYSTEMD>
+      <filter **>
+        @type grep
+        <regexp>
+          key MESSAGE
+          pattern /(Warning|Error|Fail)/i
+        </regexp>
+      </filter>
+      
+      <match **>
+        @type relabel
+        @label @DISPATCH
+      </match>
+    </label>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ES Serverless 管理平台</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ES Serverless 管理平台</h1>
+        
+        <!-- 创建集群表单 -->
+        <div class="section">
+            <h2>创建集群</h2>
+            <form id="create-cluster-form">
+                <div class="form-group">
+                    <label for="tenant_org_id">租户组织ID (必填):</label>
+                    <input type="text" id="tenant_org_id" name="tenant_org_id" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user">用户 (必填):</label>
+                    <input type="text" id="user" name="user" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="service_name">服务名称 (必填):</label>
+                    <input type="text" id="service_name" name="service_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="namespace">命名空间 (可选):</label>
+                    <input type="text" id="namespace" name="namespace">
+                </div>
+                
+                <div class="form-group">
+                    <label for="replicas">副本数:</label>
+                    <input type="number" id="replicas" name="replicas" value="1" min="1" max="10">
+                </div>
+                
+                <div class="form-group">
+                    <label for="cpu_request">CPU请求:</label>
+                    <input type="text" id="cpu_request" name="cpu_request" value="500m">
+                </div>
+                
+                <div class="form-group">
+                    <label for="cpu_limit">CPU限制:</label>
+                    <input type="text" id="cpu_limit" name="cpu_limit" value="2">
+                </div>
+                
+                <div class="form-group">
+                    <label for="mem_request">内存请求:</label>
+                    <input type="text" id="mem_request" name="mem_request" value="1Gi">
+                </div>
+                
+                <div class="form-group">
+                    <label for="mem_limit">内存限制:</label>
+                    <input type="text" id="mem_limit" name="mem_limit" value="2Gi">
+                </div>
+                
+                <div class="form-group">
+                    <label for="disk_size">磁盘大小:</label>
+                    <input type="text" id="disk_size" name="disk_size" value="10Gi">
+                </div>
+                
+                <div class="form-group">
+                    <label for="gpu_count">GPU数量:</label>
+                    <input type="number" id="gpu_count" name="gpu_count" value="0" min="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="dimension">向量维度:</label>
+                    <input type="number" id="dimension" name="dimension" value="128" min="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="vector_count">向量数量:</label>
+                    <input type="number" id="vector_count" name="vector_count" value="10000" min="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="index_limit">索引限制:</label>
+                    <input type="number" id="index_limit" name="index_limit" value="10" min="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="gitlab_url">GitLab URL (可选):</label>
+                    <input type="text" id="gitlab_url" name="gitlab_url">
+                </div>
+                
+                <button type="submit">创建集群</button>
+            </form>
+            
+            <div id="create-result" class="result"></div>
+        </div>
+        
+        <!-- 删除集群表单 -->
+        <div class="section">
+            <h2>删除集群</h2>
+            <form id="delete-cluster-form">
+                <div class="form-group">
+                    <label for="delete_namespace">命名空间 (必填):</label>
+                    <input type="text" id="delete_namespace" name="namespace" required>
+                </div>
+                
+                <button type="submit">删除集群</button>
+            </form>
+            
+            <div id="delete-result" class="result"></div>
+        </div>
+        
+        <!-- 查询集群表单 -->
+        <div class="section">
+            <h2>查询集群</h2>
+            <form id="list-clusters-form">
+                <button type="submit">查询所有集群</button>
+            </form>
+            
+            <div id="list-result" class="result"></div>
+        </div>
+        
+        <!-- 查询特定集群详情 -->
+        <div class="section">
+            <h2>查询集群详情</h2>
+            <form id="cluster-details-form">
+                <div class="form-group">
+                    <label for="cluster_namespace">命名空间 (必填):</label>
+                    <input type="text" id="cluster_namespace" name="namespace" required>
+                </div>
+                
+                <button type="submit">查询集群详情</button>
+            </form>
+            
+            <div id="details-result" class="result"></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

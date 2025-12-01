@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: es-backup
+  namespace: es-serverless
+spec:
+  schedule: "0 2 * * *"  # 每天凌晨 2 点
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: es-serverless-sa
+          containers:
+          - name: backup
+            image: postgres:15
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # 安装必要的工具
+              apt-get update && apt-get install -y curl openssl
+              
+              # 安装 MinIO 客户端
+              curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+              chmod +x /usr/local/bin/mc
+              
+              # 执行备份脚本
+              /scripts/backup-es-snapshot.sh
+              /scripts/backup-metadata.sh
+            env:
+            - name: ES_HOST
+              value: "elasticsearch:9200"
+            - name: MINIO_ENDPOINT
+              value: "minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "es_minio"
+            - name: MINIO_SECRET_KEY
+              value: "es_minio_P@ssw0rd_2025_11_28"
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "es_user"
+            - name: DB_PASSWORD
+              value: "es_password_2025"
+            - name: DB_NAME
+              value: "es_metadata"
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          volumes:
+          - name: scripts
+            configMap:
+              name: backup-scripts
+          restartPolicy: OnFailure
