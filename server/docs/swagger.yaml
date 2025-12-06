@@ -1,0 +1,207 @@
+basePath: /
+definitions:
+  main.ClusterStatus:
+    properties:
+      cpu_usage:
+        type: number
+      created_at:
+        type: string
+      details:
+        additionalProperties: true
+        type: object
+      dimension:
+        type: integer
+      disk_usage:
+        type: number
+      gpu_count:
+        type: integer
+      memory_usage:
+        type: number
+      namespace:
+        type: string
+      qps:
+        type: number
+      replicas:
+        type: integer
+      service_name:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user:
+        type: string
+      vector_count:
+        type: integer
+    type: object
+  main.CreateRequest:
+    properties:
+      cpu_limit:
+        type: string
+      cpu_request:
+        type: string
+      dimension:
+        type: integer
+      disk_size:
+        type: string
+      gitlab_url:
+        type: string
+      gpu_count:
+        type: integer
+      index_limit:
+        type: integer
+      mem_limit:
+        type: string
+      mem_request:
+        type: string
+      namespace:
+        type: string
+      replicas:
+        type: integer
+      service_name:
+        type: string
+      tenant_org_id:
+        description: 租户组织ID（多租户隔离）
+        type: string
+      user:
+        type: string
+      vector_count:
+        type: integer
+    type: object
+  main.DeleteRequest:
+    properties:
+      namespace:
+        type: string
+    type: object
+  main.ScaleRequest:
+    properties:
+      namespace:
+        type: string
+      replicas:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a server for managing Elasticsearch Serverless clusters.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: ES Serverless Manager API
+  version: "1.0"
+paths:
+  /clusters:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an Elasticsearch cluster
+      parameters:
+      - description: Cluster deletion info
+        in: body
+        name: cluster
+        required: true
+        schema:
+          $ref: '#/definitions/main.DeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete a cluster
+      tags:
+      - clusters
+    get:
+      description: List all Elasticsearch clusters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.ClusterStatus'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: List all clusters
+      tags:
+      - clusters
+    post:
+      consumes:
+      - application/json
+      description: Create a new Elasticsearch cluster
+      parameters:
+      - description: Cluster configuration
+        in: body
+        name: cluster
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create a new cluster
+      tags:
+      - clusters
+  /clusters/scale:
+    post:
+      consumes:
+      - application/json
+      description: Scale an Elasticsearch cluster
+      parameters:
+      - description: Cluster scaling info
+        in: body
+        name: cluster
+        required: true
+        schema:
+          $ref: '#/definitions/main.ScaleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Scale a cluster
+      tags:
+      - clusters
+swagger: "2.0"

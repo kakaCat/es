@@ -1,0 +1,7 @@
+# Alibaba Cloud Credentials
+access_key = "YOUR_ACCESS_KEY_HERE"
+secret_key = "YOUR_SECRET_KEY_HERE"
+
+# Optional: Override defaults
+# region = "cn-hangzhou"
+# cluster_name = "es-serverless-prod"

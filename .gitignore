@@ -59,4 +59,4 @@ docker/minikube-darwin-arm64
 *.pkg
 
 # OS specific
-Thumbs.db
+Thumbs.db*.tfvars

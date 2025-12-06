@@ -1,4 +1,0 @@
-resources:
-  - prometheus.yaml
-  - prometheus-configmap.yaml
-  - grafana.yaml

@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-register-snapshot-repo
+  namespace: es-serverless
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: curl
+          image: curlimages/curl:8.9.1
+          env:
+            - name: ES_HOST
+              value: http://elasticsearch:9200
+            - name: MINIO_ENDPOINT
+              value: http://minio:9000
+            - name: MINIO_ACCESS_KEY
+              value: es_minio
+            - name: MINIO_SECRET_KEY
+              value: es_minio_P@ssw0rd_2025_11_28
+          command: ["sh","-c"]
+          args:
+            - |
+              curl -s -X PUT "$ES_HOST/_snapshot/es-backups" \
+                -H "Content-Type: application/json" \
+                -d '{"type":"s3","settings":{"bucket":"es-backups","endpoint":"'"$MINIO_ENDPOINT"'","protocol":"http","access_key":"'"$MINIO_ACCESS_KEY"'","secret_key":"'"$MINIO_SECRET_KEY"'"}}'

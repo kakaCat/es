@@ -4,8 +4,9 @@ WORKDIR /app
 COPY server/go.mod server/go.sum* ./
 RUN go mod download || true
 COPY server/*.go ./
-COPY scripts ./scripts
-COPY k8s ./k8s
+COPY server/k8s ./k8s
+COPY server/terraform ./terraform
+COPY server/helm ./helm
 RUN CGO_ENABLED=0 GOOS=linux go build -o manager .
 
 FROM alpine:3.20
@@ -15,10 +16,10 @@ RUN curl -fsSL -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernet
     chmod +x /usr/local/bin/kubectl
 WORKDIR /app
 COPY --from=builder /app/manager /app/manager
-COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/k8s /app/k8s
+COPY --from=builder /app/terraform /app/terraform
+COPY --from=builder /app/helm /app/helm
 # Set execute permissions
-RUN chmod +x /app/scripts/cluster.sh
 ENV PATH="/usr/local/bin:${PATH}"
 EXPOSE 8080
 CMD ["/app/manager"]

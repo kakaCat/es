@@ -1,3 +1,0 @@
-resources:
-  - minio-deployment.yaml
-  - minio-service.yaml
